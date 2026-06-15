@@ -17,7 +17,7 @@
     },
     {
       title: "Fine-tune the layers.",
-      body: "Press the gear icon ⚙ to open the control panel. To adjust a setting, make the change and press 'Regenerate' to apply it.",
+      body: "Press the controls icon to open the control panel. To adjust a setting, make the change and press 'Regenerate' to apply it.",
       note: "Every layer has its own settings. Try changing them to get different effects."
     },
     {
