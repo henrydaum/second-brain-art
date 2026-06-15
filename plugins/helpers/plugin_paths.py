@@ -53,6 +53,12 @@ PLUGIN_FAMILIES = {
     "service": ("services", "service_"),
     "command": ("commands", "command_"),
     "frontend": ("frontends", "frontend_"),
+    # Techniques are canvas image-generators. They are a first-class plugin
+    # family — same built-in/sandbox/installed layout and ``technique_*.py``
+    # naming as every other kind — but with their own registry and subprocess
+    # execution (see plugins/techniques/helpers/). Making them a family is what
+    # gives them discovery, hot-reload, and path validation for free.
+    "technique": ("techniques", "technique_"),
 }
 
 PLUGIN_CONFIG = {
@@ -134,6 +140,19 @@ def iter_plugin_dirs():
 def plugin_dirs(plugin_type: str) -> tuple[PluginDir, ...]:
     """Return plugin directories for one family in precedence order."""
     return PLUGIN_CONFIG[plugin_type]
+
+
+def family_path(plugin_type: str, root_name: str) -> Path:
+    """Return the directory for one plugin family under a named root.
+
+    ``root_name`` is one of the PLUGIN_ROOTS names: "built_in", "sandbox",
+    "installed". Lets a subsystem (e.g. the technique store) name its on-disk
+    home in kernel terms instead of hard-coding a bespoke path.
+    """
+    for plugin_dir in PLUGIN_CONFIG[plugin_type]:
+        if plugin_dir.root.name == root_name:
+            return plugin_dir.path
+    raise KeyError(f"No '{root_name}' root for plugin type '{plugin_type}'")
 
 
 def _infer_type(file_name: str) -> str | None:

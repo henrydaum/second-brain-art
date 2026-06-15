@@ -83,6 +83,13 @@ substrate plus the two implementations above, including lazy function-local
 imports). Widening the boundary fails the suite until the test's allowlist —
 and this section — are updated deliberately.
 
+Techniques are a first-class plugin kind (canvas image-generators with their own
+subprocess execution). Their base class (`plugins.BaseTechnique`) and
+slug→instance catalog (`plugins.techniques.helpers.technique_registry`) are
+plugin *substrate* — the core instantiates the registry and hangs it on the
+runtime as a peer of `tool_registry` (alongside the `canvas` CanvasRuntime peer).
+The technique *files* themselves are still reached only via discovery.
+
 Everything else is discovery-based. The agent system prompt collects optional
 guidance from each in-scope plugin's `agent_prompt_for(ctx)` (see `_collect` in
 `agent/system_prompt.py`), so missing plugins degrade silently and correctly —

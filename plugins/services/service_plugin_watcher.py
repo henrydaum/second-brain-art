@@ -142,6 +142,7 @@ class PluginWatcherService(BaseService):
                 config=self.config,
                 command_registry=self._runtime.get("command_registry"),
                 frontend_manager=self._runtime.get("frontend_manager"),
+                technique_registry=self._technique_registry(),
                 runtime=self._runtime.get("runtime"),
             )
         except Exception as e:
@@ -170,6 +171,7 @@ class PluginWatcherService(BaseService):
             tool_registry=self._runtime.get("tool_registry"),
             orchestrator=self._runtime.get("orchestrator"),
             services=self.services,
+            technique_registry=self._technique_registry(),
             source_path=str(path),
             command_registry=self._runtime.get("command_registry"),
             frontend_manager=self._runtime.get("frontend_manager"),
@@ -204,6 +206,7 @@ class PluginWatcherService(BaseService):
                 source_path=source_path,
                 command_registry=self._runtime.get("command_registry"),
                 frontend_manager=self._runtime.get("frontend_manager"),
+                technique_registry=self._technique_registry(),
             )
         except Exception as e:
             logger.error(f"Quarantine of {plugin_type} '{name}' failed: {e}")
@@ -219,9 +222,16 @@ class PluginWatcherService(BaseService):
         """Internal helper to handle notify."""
         bus.emit(CHAT_MESSAGE_PUSHED, {"message": message, "kind": "plugin", "source": "plugin_watcher"})
 
+    def _technique_registry(self):
+        """The runtime's technique catalog, or None before the runtime exists."""
+        return getattr(self._runtime.get("runtime"), "technique_registry", None)
+
     def _names_registered_from(self, plugin_type: str, path: Path) -> list[str]:
         """Internal helper to handle names registered from."""
         source = str(path.resolve())
+        if plugin_type == "technique":
+            registry = self._technique_registry()
+            return registry.slugs_by_source(path) if registry is not None else []
         if plugin_type == "tool":
             items = getattr(self._runtime.get("tool_registry"), "tools", {})
         elif plugin_type == "task":
@@ -264,7 +274,7 @@ class PluginWatcherService(BaseService):
 # Load priority: services must register before the tasks that require them, so
 # a batch install (many files landing at once) doesn't leave tasks warning about
 # missing services. Lower number = loaded first. Unknown types load last.
-_LOAD_PRIORITY = {"service": 0, "task": 1, "tool": 2, "command": 3, "frontend": 4}
+_LOAD_PRIORITY = {"service": 0, "task": 1, "tool": 2, "technique": 2, "command": 3, "frontend": 4}
 
 
 class _PluginEventHandler(FileSystemEventHandler):

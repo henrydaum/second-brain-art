@@ -137,6 +137,7 @@ _TASK_CONFIG = _discovery_config("task")
 _SERVICE_CONFIG = _discovery_config("service")
 _COMMAND_CONFIG = _discovery_config("command")
 _FRONTEND_CONFIG = _discovery_config("frontend")
+_TECHNIQUE_CONFIG = _discovery_config("technique")
 
 
 # ── Bulk discovery (startup) ─────────────────────────────────────────
@@ -287,6 +288,48 @@ def discover_tasks(root_dir: Path, orchestrator, config: dict, reload: bool = Fa
     logger.info(f"Discovered {count} task(s) in {time.time() - t0:.2f}s")
 
 
+def discover_techniques(root_dir: Path, technique_registry, config: dict | None = None, reload: bool = False):
+    """Discover and register all canvas techniques.
+
+    Mirrors ``discover_tools``: each ``technique_*.py`` under the technique
+    family roots is imported in-process, its ``BaseTechnique`` subclass is
+    instantiated, and the instance is registered (slug-keyed) in the
+    technique_registry. Instantiation here is cheap metadata only — technique
+    ``run()`` bodies execute later in the subprocess sandbox, never at import.
+    """
+    from plugins.BaseTechnique import BaseTechnique
+    cfg = _TECHNIQUE_CONFIG
+    t0 = time.time()
+    count = 0
+    seen_slugs = set()
+
+    if reload:
+        _purge_plugin_settings({"technique"})
+
+    for plugin_dir in cfg["dirs"]:
+        if not plugin_dir.path.exists():
+            continue
+        for py_file in sorted(plugin_dir.path.glob(cfg["glob"])):
+            module_name = plugin_dir.module_name(py_file.stem)
+            module = _load_plugin_module(module_name, py_file, plugin_dir.root.built_in, reload)
+            if module is None:
+                continue
+            for instance in _find_subclass_instances(module, BaseTechnique, module_name):
+                slug = getattr(instance, "slug", "") or ""
+                if not slug:
+                    continue
+                if slug in seen_slugs:
+                    logger.warning(f"Technique '{slug}' from {plugin_dir.root.name} collides with an earlier root — skipped")
+                    continue
+                instance._source_path = _source_path(py_file)
+                technique_registry.register(instance)
+                _collect_config_settings(instance, plugin_type="technique")
+                seen_slugs.add(slug)
+                count += 1
+
+    logger.info(f"Discovered {count} technique(s) in {time.time() - t0:.2f}s")
+
+
 def discover_services(root_dir: Path, config: dict) -> dict:
     """Discover all services. Returns {name: instance}."""
     _setting_to_services.clear()
@@ -335,6 +378,7 @@ def load_single_plugin(plugin_type: str, file_path: Path,
                        tool_registry=None, orchestrator=None,
                        services: dict = None, config: dict = None,
                        command_registry=None, frontend_manager=None,
+                       technique_registry=None,
                        runtime=None) -> tuple[str | None, str | None]:
     """
     Load a single sandbox plugin file and register it.
@@ -358,6 +402,8 @@ def load_single_plugin(plugin_type: str, file_path: Path,
         return _load_single_command(file_path, command_registry or getattr(tool_registry, "command_registry", None))
     elif plugin_type == "frontend":
         return _load_single_frontend(file_path, frontend_manager)
+    elif plugin_type == "technique":
+        return _load_single_technique(file_path, technique_registry or getattr(runtime, "technique_registry", None))
     else:
         return None, f"Unknown plugin_type: {plugin_type}"
 
@@ -365,10 +411,16 @@ def load_single_plugin(plugin_type: str, file_path: Path,
 def unload_plugin(plugin_type: str, plugin_name: str,
                   tool_registry=None, orchestrator=None,
                   services: dict = None, source_path: str = None,
-                  command_registry=None, frontend_manager=None):
+                  command_registry=None, frontend_manager=None,
+                  technique_registry=None):
     """Unregister a plugin. For services, uses source_path to find all
     service names registered from that file."""
-    if plugin_type == "tool" and tool_registry:
+    if plugin_type == "technique" and technique_registry:
+        if source_path:
+            technique_registry.unregister_by_source(source_path)
+        elif plugin_name:
+            technique_registry.unregister(plugin_name)
+    elif plugin_type == "tool" and tool_registry:
         for name in _names_by_source(getattr(tool_registry, "tools", {}), plugin_name, source_path):
             tool_registry.unregister(name)
     elif plugin_type == "task" and orchestrator:
@@ -461,6 +513,30 @@ def _load_single_tool(file_path: Path, tool_registry) -> tuple[str | None, str |
     tool_registry.register(instance)
     _collect_config_settings(instance, plugin_type="tool")
     return instance.name, None
+
+
+def _load_single_technique(file_path: Path, technique_registry) -> tuple[str | None, str | None]:
+    """Internal helper to load single technique."""
+    from plugins.BaseTechnique import BaseTechnique
+    info, err = plugin_info(file_path)
+    if err:
+        return None, err
+    module_name = info.module_name
+    if technique_registry is None:
+        return None, "No technique registry available"
+
+    module = _load_plugin_module(module_name, file_path, info.built_in, reload=True)
+    if module is None:
+        return None, f"Failed to import {file_path.name}"
+
+    instances = _find_subclass_instances(module, BaseTechnique, module_name)
+    instance = next((item for item in instances if getattr(item, "slug", "")), None)
+    if instance is None:
+        return None, f"No named BaseTechnique subclass found in {file_path.name}"
+    instance._source_path = _source_path(file_path)
+    technique_registry.register(instance)
+    _collect_config_settings(instance, plugin_type="technique")
+    return instance.slug, None
 
 
 def _load_single_frontend(file_path: Path, frontend_manager) -> tuple[str | None, str | None]:

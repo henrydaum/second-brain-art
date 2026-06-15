@@ -209,7 +209,9 @@ from runtime.bootstrap import start_frontends
 from runtime.supervisor import supervisor
 from runtime.heartbeat import heartbeat
 from plugins.BaseService import should_autoload_service
-from plugins.plugin_discovery import discover_services, discover_tasks, discover_tools, get_plugin_settings
+from plugins.plugin_discovery import discover_services, discover_tasks, discover_techniques, discover_tools, get_plugin_settings
+from plugins.techniques.helpers.technique_registry import TechniqueRegistry
+from canvas.runtime import CanvasRuntime
 
 
 @dataclass
@@ -220,6 +222,8 @@ class Scaffold:
 	services: dict = field(default_factory=dict)
 	config: dict = field(default_factory=dict)
 	tool_registry: Any = None
+	technique_registry: Any = None
+	canvas_runtime: Any = None
 	watcher: Any = None
 	event_trigger: Any = None
 	frontend_runtime: Any = None
@@ -311,11 +315,24 @@ def main():
 	discover_tools(_ROOT, tool_registry, config)
 	logger.info(f"Tools registered: {list(tool_registry.tools.keys())} ({time.time() - t0:.2f}s)")
 
+	# --- 5b2. Initialize technique registry (canvas image-generators) ---
+	t0 = time.time()
+	technique_registry = TechniqueRegistry()
+	discover_techniques(_ROOT, technique_registry, config)
+	logger.info(f"Techniques registered: {len(technique_registry.list(include_hidden=True))} ({time.time() - t0:.2f}s)")
+
+	# --- 5b3. Initialize canvas runtime (session→canvas registry + dispatch) ---
+	# A runtime peer like ConversationRuntime/Orchestrator — one stateful
+	# instance, db-backed, surfaced on the runtime + context (not a service).
+	canvas_runtime = CanvasRuntime(database)
+
 	# --- 5c. Reconcile plugin config defaults ---
 	config_manager.reconcile_plugin_config(config, get_plugin_settings())
 
 	# --- 6. Initialize app context ---
 	scaffold = Scaffold(orchestrator, database, services, config, tool_registry)
+	scaffold.technique_registry = technique_registry
+	scaffold.canvas_runtime = canvas_runtime
 
 	# --- 6b. Determine which frontends to start ---
 	frontends = set(config.get("enabled_frontends", ["repl", "telegram"]))

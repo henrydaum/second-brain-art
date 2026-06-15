@@ -199,6 +199,8 @@ def _conversation_runtime(scaffold, shutdown_fn, tool_registry, services, config
         emit_event=lambda channel, payload: bus.emit(channel, payload),
     )
     runtime.command_registry = registry
+    runtime.technique_registry = getattr(scaffold, "technique_registry", None)
+    runtime.canvas = getattr(scaffold, "canvas_runtime", None)
     runtime._orchestrator_ref = scaffold.orchestrator
     ref["runtime"] = runtime
     # Tasks running through the orchestrator reach the runtime via

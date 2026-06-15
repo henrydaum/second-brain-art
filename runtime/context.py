@@ -43,6 +43,8 @@ class SecondBrainContext:
     approve_command: Any = None  # callable(command, justification) -> bool (tools only)
     request_user_input: Any = None # callable(...)->StateMachineApprovalRequest (tools only)
     tool_registry: Any = None    # ToolRegistry instance (tools only)
+    technique_registry: Any = None # TechniqueRegistry — canvas technique catalog.
+    canvas: Any = None           # CanvasRuntime — session→canvas registry + dispatch.
     orchestrator: Any = None     # Orchestrator instance (tools only)
     runtime: Any = None          # ConversationRuntime — present for tasks that
                                  # need to drive a state-machine session.
@@ -140,6 +142,13 @@ def build_context(db, config: dict, services: dict, call_tool=None,
                 return False
             return req.approved
 
+    # The technique catalog and the canvas runtime hang off the runtime (peer
+    # registries like tool_registry); surface them on the context so canvas
+    # tools/commands read them uniformly instead of reaching back through the
+    # runtime or pulling them out of the services dict.
+    technique_registry = getattr(runtime, "technique_registry", None) if runtime is not None else None
+    canvas = getattr(runtime, "canvas", None) if runtime is not None else None
+
     ctx = SecondBrainContext(
         db=db,
         config=effective_config,
@@ -148,6 +157,8 @@ def build_context(db, config: dict, services: dict, call_tool=None,
         approve_command=approve_command,
         request_user_input=request_user_input,
         tool_registry=tool_registry,
+        technique_registry=technique_registry,
+        canvas=canvas,
         orchestrator=orchestrator,
         runtime=runtime,
         root_dir=root_dir,

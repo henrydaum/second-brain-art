@@ -260,6 +260,33 @@ Payload:
                  table, written elsewhere, and are not covered here)"""
 
 
+# ── Canvas ─────────────────────────────────────────────────────────
+
+CANVAS_CHANGED = "canvas_changed"
+"""A session's canvas chain changed (layer added/removed/reordered/etc.). Lets a
+frontend re-fetch and redraw the canvas without polling.
+Payload:
+    session_key: str
+    action:      str — the canvas action that caused the change
+    canvas:      dict (optional) — fresh canvas snapshot, when available"""
+
+CANVAS_RENDER_STATUS = "canvas_render_status"
+"""Incremental progress while a canvas renders its technique chain in the
+subprocess sandbox. Emitted per-layer so a frontend can show a progress bar.
+Payload:
+    session_key:    str | None
+    status:         str — 'started' | 'layer_started' | 'layer_finished' |
+                          'finished' | 'error'
+    total_layers:   int
+    cached_layers:  int
+    layer_index:    int (optional) — for layer_started/finished
+    technique_slug: str (optional)
+    seed:           int
+    pool_hash:      str
+    timeout_s:      float
+    error:          str (optional) — on status='error'"""
+
+
 # ── Reserved (kernel-owned, not yet emitted) ───────────────────────
 # Future *kernel* channels — the producer would live in the kernel but doesn't
 # exist yet. Documented so the work has an obvious home instead of an ad-hoc

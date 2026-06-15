@@ -31,10 +31,16 @@ SUBSTRATE = frozenset({
     "plugins.BaseService",
     "plugins.BaseTask",
     "plugins.BaseTool",
+    "plugins.BaseTechnique",
     "plugins.plugin_discovery",
     "plugins.helpers.plugin_paths",
     "plugins.helpers.memory_paths",
     "plugins.frontends.helpers.command_registry",
+    # Techniques are a first-class plugin kind; their slug→instance registry is
+    # the catalog the core instantiates (like the command-registry adapter) and
+    # hangs on the runtime as a peer of tool_registry. Substrate, not a plugin
+    # implementation — the technique *files* are still reached via discovery.
+    "plugins.techniques.helpers.technique_registry",
 })
 
 # The two sanctioned plugin implementations, pinned to the exact core files
