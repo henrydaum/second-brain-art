@@ -24,6 +24,7 @@ from runtime.agent_scope import AgentScope
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[1]
 _STATIC_PROMPT_PATH = Path(__file__).with_name("system_prompt_static.md")
+_ART_ENCYCLOPEDIA_PATH = Path(__file__).with_name("generative_art_encyclopedia.md")
 
 SYSTEM_CONTEXT_MARKER = "[SYSTEM CONTEXT UPDATE]"
 
@@ -43,6 +44,7 @@ class PromptContext:
     scope: "AgentScope | None" = None
     profile_name: str = "default"
     frontend_name: str | None = None
+    tool_registry: Any = None
 
 
 def _static_prompt() -> str:
@@ -78,7 +80,7 @@ def build_prompt_sections(
     pctx = PromptContext(
         db=db, services=services or {}, orchestrator=orchestrator,
         config=config or {}, scope=scope, profile_name=profile_name,
-        frontend_name=frontend_name,
+        frontend_name=frontend_name, tool_registry=r,
     )
     semi = [
         _tool_catalog(r),
@@ -88,6 +90,7 @@ def build_prompt_sections(
         _collect(_tasks_for_prompt(orchestrator), pctx),
         _collect(_visible_commands_for_prompt(commands, command_filter), pctx),
         _collect([frontend] if frontend is not None else [], pctx),
+        _generative_art_encyclopedia()
     ]
     dynamic = [
         _current_datetime(),
@@ -111,6 +114,13 @@ def build_prompt_sections(
         {"role": "system", "content": f"{static_block}\n\n{semi_block}"},
         {"role": "user", "content": dynamic_block},
     ]
+
+
+def _generative_art_encyclopedia() -> str:
+    try:
+        return _ART_ENCYCLOPEDIA_PATH.read_text(encoding="utf-8").strip()
+    except OSError:
+        return ""
 
 
 def build_system_prompt(*args, **kwargs) -> str:
