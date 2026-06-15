@@ -31,14 +31,14 @@
       note: "Anything you share can be opened and remixed by anyone who sees it — they get the layers and settings, but your personal canvas remains unaffected."
     },
     {
-      title: "Make an account.",
-      body: "Sign in to keep your saved canvases and unlock Second Brain's code-writing abilities. This unlocks unparallel customizability.",
+      title: "Use advanced settings.",
+      body: "Open settings to enable technique authoring or include community techniques.",
       note: "Second Brain uses code to generate images. Writing new code typically takes longer because Second Brain tests it and checks for bugs."
     },
     {
-      title: "Add more credits.",
-      body: "Need more usage? Top up with extra credits from your account page.",
-      note: "Usage limits keep things fair for everyone."
+      title: "Keep links you care about.",
+      body: "Saved canvases are tied to this browser, while share links are persistent URLs.",
+      note: "If you want a durable reference outside this browser, keep the share link."
     }
   ];
 

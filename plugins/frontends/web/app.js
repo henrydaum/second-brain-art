@@ -1,24 +1,14 @@
-// TIPS / TIPS_SIGNED_IN are defined in tips.js, loaded before this script.
-// We merge the signed-in pool in once we know the viewer has an account,
-// so anonymous visitors don't see tips about account-only features.
-// NOTE: `signedIn` must be declared before pickTip() runs — pickTip reads
-// it on initial load, and `let` declarations sit in TDZ until execution
-// reaches them (typeof doesn't save you for let/const). Setting it here
-// up top avoids a ReferenceError that would halt script load.
-let signedIn = false;
+// TIPS is defined in tips.js, loaded before this script.
 function pickTip() {
   const el = document.querySelector("#tipText");
   if (!el) return;
-  const extra = (signedIn && Array.isArray(TIPS_SIGNED_IN)) ? TIPS_SIGNED_IN : [];
-  const pool = Array.isArray(TIPS) ? TIPS.concat(extra) : extra;
+  const pool = Array.isArray(TIPS) ? TIPS : [];
   if (pool.length) el.textContent = pool[Math.floor(Math.random() * pool.length)];
 }
 pickTip();
 
 const sid = localStorage.sbDemoSession || (localStorage.sbDemoSession = crypto.randomUUID());
-// Mirror sid into a cookie so /files img requests carry the identity
-// (image <img src=...> requests can't easily set query params, but they
-// send cookies automatically). Tomorrow's real auth replaces this.
+// Mirror sid into a cookie so /files image requests carry the browser identity.
 document.cookie = `sb_sid=${encodeURIComponent(sid)}; path=/; SameSite=Strict; max-age=31536000`;
 const messages = document.querySelector("#messages");
 const chat = document.querySelector(".chat");
@@ -34,8 +24,6 @@ const downloadPanel = document.querySelector("#downloadPanel");
 const saveBtn = document.querySelector("#saveImage");
 const shareBtn = document.querySelector("#shareImage");
 const sharePanel = document.querySelector("#sharePanel");
-const shareTitle = document.querySelector("#shareTitle");
-const shareArtist = document.querySelector("#shareArtist");
 const shareLinkInput = document.querySelector("#shareLink");
 const shareQrImg = document.querySelector("#shareQr");
 const shareQrDownload = document.querySelector("#downloadQr");
@@ -47,13 +35,13 @@ const linkModalUrl = document.querySelector("#linkModalUrl");
 const linkModalQr = document.querySelector("#linkModalQr");
 const linkModalCopy = document.querySelector("#linkModalCopy");
 const linkModalDownload = document.querySelector("#linkModalDownload");
-const gallery = document.querySelector("#gallery");
-const paginator = document.querySelector("#paginator");
 const archive = document.querySelector("#archive");
 const archivePaginator = document.querySelector("#archivePaginator");
-const galleryTabs = document.querySelector("#galleryTabs");
-const sharedPanel = document.querySelector("#sharedPanel");
-const archivePanel = document.querySelector("#archivePanel");
+const settingsBtn = document.querySelector("#settingsBtn");
+const settingsModal = document.querySelector("#settingsModal");
+const settingsStatus = document.querySelector("#settingsStatus");
+const prefTechniqueAuthoring = document.querySelector("#prefTechniqueAuthoring");
+const prefCommunityTechniques = document.querySelector("#prefCommunityTechniques");
 const controlsPanel = document.querySelector("#controlsPanel");
 const controlsDrawer = document.querySelector("#controlsDrawer");
 const controlsToggle = document.querySelector("#controlsToggle");
@@ -63,9 +51,7 @@ const NEAR_BOTTOM_PX = 80;
 const GALLERY_PAGE = 10;
 let palettesCache = [];
 let currentControlsPanels = [];
-const galleryPages = {shared: 1, archive: 1};
-const galleryMineOnly = {shared: false, archive: false};
-let activeTab = "shared";
+let archivePage = 1;
 const pendingControls = new Map();
 let typingEl = null;
 const TOOL_LABELS = {
@@ -81,7 +67,6 @@ const TOOL_LABELS = {
   sql_query: "Querying database",
   ask_user_question: "Asking a question",
   propose_plan: "Proposing a plan",
-  manage_promo_codes: "Managing promo codes",
 };
 function toolLabel(name) {
   if (!name) return "";
@@ -142,29 +127,26 @@ const add = (role, text, useMd = false) => {
   return el;
 };
 function refillText(seconds) {
-  if (seconds == null) return "Your free credits will be back later.";
-  if (seconds <= 60) return "Your free credits refill in less than a minute.";
-  if (seconds < 3600) return `Your free credits refill in about ${Math.ceil(seconds / 60)} minutes.`;
+  if (seconds == null) return "Usage will be available again later.";
+  if (seconds <= 60) return "Usage will be available again in less than a minute.";
+  if (seconds < 3600) return `Usage will be available again in about ${Math.ceil(seconds / 60)} minutes.`;
   const hours = Math.ceil(seconds / 3600);
-  return `Your free credits refill in about ${hours} hour${hours === 1 ? "" : "s"}.`;
+  return `Usage will be available again in about ${hours} hour${hours === 1 ? "" : "s"}.`;
 }
 function renderCreditError(error) {
   const d = error?.details || {}, available = Number(d.total_available || 0);
   const el = document.createElement("article");
   el.className = "error credit-error";
   const title = document.createElement("strong");
-  title.textContent = available ? "Not enough credits for that" : "You're out of credits for now";
+  title.textContent = available ? "Not enough usage available for that" : "Usage is paused for now";
   const body = document.createElement("p");
   body.textContent = available
-    ? `That needs ${Number(d.required || 1)} credits, and you have ${available}. You can still try a manual edit.`
-    : "You're out of free credits for now.";
+    ? `That needs ${Number(d.required || 1)} units, and you have ${available}. You can still try a manual edit.`
+    : "The current usage limit has been reached.";
   const refill = document.createElement("p");
   refill.className = "credit-refill";
   refill.textContent = refillText(d.next_refill_seconds);
-  const link = document.createElement("a");
-  link.href = "/account";
-  link.textContent = "Open your account to buy more credits";
-  el.append(title, body, refill, link);
+  el.append(title, body, refill);
   messages.appendChild(el);
   reveal(el);
 }
@@ -290,17 +272,14 @@ function render(events) {
     }
     else if (ev.type === "form") add("assistant", `${ev.form?.display?.prompt || "Input required"}\n${(ev.form?.display?.choices || []).map(c => c.label || c.value).join(" / ")}`);
     else if (ev.type === "approval") approval(ev);
-    else if (ev.type === "account") setAccount(ev.account);
     else if (ev.type === "hero_image") {
       clearPendingControls(false);
       setCanvas(ev.canvas || {url: ev.url, name: ev.name});
     }
     else if (ev.type === "canvas_reset") { clearPendingControls(false); setCanvas(null); }
-    else if (ev.type === "shared") { loadGallery(1); }
+    else if (ev.type === "saved") { loadArchive(1); }
     else if (ev.type === "share_link") {
       setShareLink(ev.url, ev.qr_url);
-      // When Save mints a link, the share panel is usually closed — surface
-      // it in the same modal that gallery "Get link" uses so the user sees it.
       if (sharePanel.hidden && ev.kind === "archive") openLinkModal(ev.url, ev.qr_url, ev.share_id);
     }
     else if (ev.type === "attachment") add("assistant", `Attachment: ${ev.name}`);
@@ -340,114 +319,41 @@ function setTyping(on) {
   if (!on) clearStatus();
 }
 
-// ----- account + credits + auth -----
-const accountAvatar = document.querySelector("#accountAvatar");
-const avatarInner = document.querySelector("#avatarInner");
-const avatarSilhouette = document.querySelector("#avatarSilhouette");
-const avatarLetter = document.querySelector("#avatarLetter");
-avatarInner.style.transition = "border-color 160ms ease, color 160ms ease";
-avatarInner.addEventListener("mouseenter", () => { avatarInner.style.borderColor = "var(--accent)"; avatarInner.style.color = "var(--accent)"; });
-avatarInner.addEventListener("mouseleave", () => { avatarInner.style.borderColor = "var(--line)"; avatarInner.style.color = "var(--text)"; });
-const signinModal = document.querySelector("#signinModal");
-const promoModal = document.querySelector("#promoModal");
-const signinForm = document.querySelector("#signinForm");
-const signinEmail = document.querySelector("#signinEmail");
-const signinStatus = document.querySelector("#signinStatus");
-const promoForm = document.querySelector("#promoForm");
-const promoCode = document.querySelector("#promoCode");
-const promoStatus = document.querySelector("#promoStatus");
-
+// ----- settings -----
 function openModal(el) { el.hidden = false; }
 function closeModal(el) { el.hidden = true; }
 document.querySelectorAll("[data-close]").forEach(b => b.addEventListener("click", () => closeModal(document.getElementById(b.dataset.close))));
-[signinModal, promoModal].forEach(m => m.addEventListener("click", e => { if (e.target === m) closeModal(m); }));
+if (settingsModal) settingsModal.addEventListener("click", e => { if (e.target === settingsModal) closeModal(settingsModal); });
 
-window.addEventListener("pageshow", () => refreshAccount());
-
-function setAccount(acc) {
+function applySettings(settings) {
+  prefTechniqueAuthoring.checked = !!settings?.technique_authoring_enabled;
+  prefCommunityTechniques.checked = !!settings?.community_techniques_enabled;
+}
+async function refreshSettings() {
+  try { applySettings((await get(`/api/settings?_=${Date.now()}`)).settings); }
+  catch (err) { console.warn("[settings] refresh failed:", err); }
+}
+async function saveSetting(key, value) {
+  settingsStatus.hidden = true;
   try {
-    const wasSignedIn = signedIn;
-    signedIn = !!acc?.signed_in;
-    syncMineToggleVisibility();
-    if (!wasSignedIn && signedIn) pickTip();
-    if (wasSignedIn && !signedIn) {
-      // Signing out: drop any Mine filter so we don't keep showing a
-      // filtered (and now always-empty) gallery.
-      let needsReload = false;
-      for (const kind of Object.keys(galleryMineOnly)) {
-        if (galleryMineOnly[kind]) { galleryMineOnly[kind] = false; needsReload = true; }
-      }
-      document.querySelectorAll(".gc-mine-toggle").forEach(b => b.setAttribute("aria-pressed", "false"));
-      if (needsReload) { loadGalleryFor("shared", 1); loadGalleryFor("archive", 1); }
-    }
-    const email = acc?.signed_in && typeof acc?.email === "string" && acc.email.length > 0 ? acc.email : "";
-    if (email) {
-      avatarLetter.textContent = email[0].toUpperCase();
-      avatarLetter.style.display = "";
-      avatarSilhouette.style.display = "none";
-    } else {
-      avatarLetter.style.display = "none";
-      avatarSilhouette.style.display = "block";
-    }
-    accountAvatar.title = email ? `Signed in as ${email}` : "Account";
-    accountAvatar.hidden = false;
+    const r = await post("/api/settings", {settings: {[key]: value}});
+    if (!r.ok) throw new Error(r.error || "Could not save setting.");
+    applySettings(r.settings);
+    settingsStatus.hidden = false;
+    settingsStatus.className = "modal-status ok";
+    settingsStatus.textContent = "Saved.";
+    techniquesCache = [];
+    techniquesLoading = null;
+    loadTechniques();
   } catch (err) {
-    console.warn("[account] setAccount failed:", err, acc);
+    settingsStatus.hidden = false;
+    settingsStatus.className = "modal-status err";
+    settingsStatus.textContent = err.message;
   }
 }
-async function refreshAccount() {
-  try { const r = await get(`/api/account?_=${Date.now()}`); setAccount(r.account); }
-  catch (err) { console.warn("[account] refresh failed:", err); }
-}
-signinForm.addEventListener("submit", async e => {
-  e.preventDefault();
-  signinStatus.hidden = true;
-  const btn = signinForm.querySelector("button");
-  btn.disabled = true;
-  try {
-    const r = await post("/api/auth/request", {email: signinEmail.value});
-    signinStatus.hidden = false;
-    signinStatus.className = "modal-status " + (r.ok ? "ok" : "err");
-    signinStatus.textContent = r.ok
-      ? (r.delivered ? "Check your inbox for the sign-in link." : "Link generated — see server logs (email not configured).")
-      : (r.error || "Could not send link.");
-  } catch (err) {
-    signinStatus.hidden = false; signinStatus.className = "modal-status err"; signinStatus.textContent = err.message;
-  } finally { btn.disabled = false; }
-});
-promoForm.addEventListener("submit", async e => {
-  e.preventDefault();
-  promoStatus.hidden = true;
-  const btn = promoForm.querySelector("button");
-  btn.disabled = true;
-  try {
-    const r = await post("/api/promo/redeem", {code: promoCode.value});
-    promoStatus.hidden = false;
-    promoStatus.className = "modal-status " + (r.ok ? "ok" : "err");
-    promoStatus.textContent = r.ok
-      ? `Redeemed — granted ${r.granted}.`
-      : (r.error || "Could not redeem code.");
-    if (r.ok) { refreshAccount(); setTimeout(() => closeModal(promoModal), 1200); }
-    if (!r.ok && r.need_auth) { closeModal(promoModal); openModal(signinModal); }
-  } catch (err) {
-    promoStatus.hidden = false; promoStatus.className = "modal-status err"; promoStatus.textContent = err.message;
-  } finally { btn.disabled = false; }
-});
-
-// Surface checkout return-state from query string.
-(() => {
-  const params = new URLSearchParams(window.location.search);
-  if (params.get("checkout") === "success") {
-    add("status", "Payment confirmed. Welcome back.");
-    history.replaceState({}, "", "/");
-  } else if (params.get("checkout") === "cancel") {
-    add("status", "Checkout canceled.");
-    history.replaceState({}, "", "/");
-  } else if (params.get("checkout") === "pending") {
-    add("status", "Payment is processing — your credits will appear shortly.");
-    history.replaceState({}, "", "/");
-  }
-})();
+settingsBtn?.addEventListener("click", () => { openModal(settingsModal); refreshSettings(); });
+prefTechniqueAuthoring?.addEventListener("change", () => saveSetting("technique_authoring_enabled", prefTechniqueAuthoring.checked));
+prefCommunityTechniques?.addEventListener("change", () => saveSetting("community_techniques_enabled", prefCommunityTechniques.checked));
 
 // ----- Canvas + theming -----
 let currentCanvasSize = 0;     // tracks live canvas dimension for download tier labels
@@ -469,15 +375,14 @@ function setCanvas(c) {
     showcase.classList.add("has-image");
     renderControlsPanel(c?.controls_panels || []);
   };
-  if (!showcase.classList.contains("has-image")) { apply(); heroImage.addEventListener("load", () => applyAccents(heroImage), {once: true}); loadGallery(1); return; }
+  if (!showcase.classList.contains("has-image")) { apply(); heroImage.addEventListener("load", () => applyAccents(heroImage), {once: true}); return; }
   const pre = new Image();
   pre.crossOrigin = "anonymous";
   pre.onload = () => {
     apply();
     heroImage.addEventListener("load", () => applyAccents(heroImage), {once: true});
-    loadGallery(galleryPages.shared);
   };
-  pre.onerror = () => { apply(); loadGallery(galleryPages.shared); };
+  pre.onerror = () => { apply(); };
   pre.src = newUrl;
 }
 
@@ -561,38 +466,29 @@ function hexWithAlpha(hex, a) {
 
 async function loadCanvas() { const r = await get("/api/canvas"); setCanvas(r.canvas); }
 
-// ----- Gallery + pagination -----
-const GALLERY_TABS = {
-  shared: {url: "/api/gallery", grid: gallery, paginator: paginator, empty: "No shared canvases yet.", action: "Remix", endpoint: "/api/remix"},
-  archive: {url: "/api/archive", grid: archive, paginator: archivePaginator, empty: "Your archive is empty. Save a canvas to start.", action: "Remix", endpoint: "/api/archive_remix"},
-};
-
-async function loadGalleryFor(kind, page = 1) {
-  const cfg = GALLERY_TABS[kind];
-  if (!cfg) return;
-  galleryPages[kind] = Math.max(1, page);
-  const offset = (galleryPages[kind] - 1) * GALLERY_PAGE;
-  const mineParam = galleryMineOnly[kind] ? "&mine=1" : "";
-  const r = await get(`${cfg.url}?limit=${GALLERY_PAGE}&offset=${offset}${mineParam}`);
+// ----- Saved canvases -----
+async function loadArchive(page = 1) {
+  archivePage = Math.max(1, page);
+  const offset = (archivePage - 1) * GALLERY_PAGE;
+  const r = await get(`/api/archive?limit=${GALLERY_PAGE}&offset=${offset}`);
   const items = Array.isArray(r.items) ? r.items : (Array.isArray(r) ? r : []);
   const total = typeof r.total === "number" ? r.total : items.length + offset;
   const shareIcon = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="12" r="2.4"/><circle cx="18" cy="6" r="2.4"/><circle cx="18" cy="18" r="2.4"/><line x1="8.1" y1="11" x2="15.9" y2="7.1"/><line x1="8.1" y1="13" x2="15.9" y2="16.9"/></svg>`;
-  cfg.grid.innerHTML = items.map(x => {
+  archive.innerHTML = items.map(x => {
     const thumb = x.url + (x.url.includes("?") ? "&" : "?") + "w=512";
-    const deleteBtn = x.mine ? `<button class="gc-delete-btn" data-kind="${kind}" data-pool-hash="${esc(x.pool_hash || x.path)}" data-action="delete" title="${kind === "shared" ? "Remove from shared gallery" : "Remove from archive"}" aria-label="Delete"></button>` : "";
-    return `<article class="gallery-card">${deleteBtn}<img src="${thumb}" alt="" loading="lazy" decoding="async"><div><strong>${esc(x.title)}</strong><small>${esc(x.artist)}${x.score ? ` · ${(x.score*100).toFixed(0)}% similar` : ""}</small><div class="gallery-card-actions"><button data-kind="${kind}" data-path="${esc(x.path)}" data-action="remix">${cfg.action}</button><button class="gc-share-btn" data-kind="${kind}" data-path="${esc(x.path)}" data-action="link" title="Get share link" aria-label="Get share link">${shareIcon}</button></div></div></article>`;
-  }).join("") || `<article class='assistant'>${cfg.empty}</article>`;
-  renderPaginatorFor(kind, total);
+    const ph = esc(x.pool_hash || x.path);
+    const deleteBtn = `<button class="gc-delete-btn" data-pool-hash="${ph}" data-action="delete" title="Remove from saved canvases" aria-label="Delete"></button>`;
+    return `<article class="gallery-card">${deleteBtn}<img src="${thumb}" alt="" loading="lazy" decoding="async"><div><strong>${esc(x.title)}</strong><small>${esc(x.artist)}${x.score ? ` · ${(x.score*100).toFixed(0)}% similar` : ""}</small><div class="gallery-card-actions"><button data-path="${ph}" data-action="remix">Remix</button><button class="gc-share-btn" data-path="${ph}" data-action="link" title="Get share link" aria-label="Get share link">${shareIcon}</button></div></div></article>`;
+  }).join("") || `<article class='assistant'>Your saved canvases will appear here.</article>`;
+  renderArchivePaginator(total);
 }
-function loadGallery(page = 1) { return loadGalleryFor("shared", page); }
 
-function renderPaginatorFor(kind, total) {
-  const cfg = GALLERY_TABS[kind];
-  const el = cfg.paginator;
+function renderArchivePaginator(total) {
+  const el = archivePaginator;
   const pages = Math.max(1, Math.ceil(total / GALLERY_PAGE));
   if (pages <= 1) { el.hidden = true; el.innerHTML = ""; return; }
   el.hidden = false;
-  const cur = galleryPages[kind];
+  const cur = archivePage;
   const btns = [];
   btns.push(`<button type="button" data-page="${cur-1}" ${cur===1?"disabled":""}>‹</button>`);
   const set = new Set([1, pages, cur-1, cur, cur+1]);
@@ -604,40 +500,13 @@ function renderPaginatorFor(kind, total) {
   el.innerHTML = btns.join("");
 }
 
-for (const [kind, cfg] of Object.entries(GALLERY_TABS)) {
-  cfg.paginator.addEventListener("click", e => {
-    const b = e.target.closest("button[data-page]");
-    if (!b || b.disabled) return;
-    const p = +b.dataset.page;
-    if (!Number.isFinite(p)) return;
-    loadGalleryFor(kind, p);
-    document.querySelector(".gallery-section").scrollIntoView({behavior: "smooth", block: "start"});
-  });
-}
-
-galleryTabs.addEventListener("click", e => {
-  const b = e.target.closest("button[data-tab]");
-  if (!b) return;
-  const kind = b.dataset.tab;
-  activeTab = kind;
-  galleryTabs.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t === b));
-  sharedPanel.hidden = kind !== "shared";
-  archivePanel.hidden = kind !== "archive";
-  loadGalleryFor(kind, galleryPages[kind]);
-});
-
-function syncMineToggleVisibility() {
-  document.querySelectorAll(".gc-mine-toggle").forEach(b => { b.hidden = !signedIn; });
-}
-
-document.querySelectorAll(".gc-mine-toggle").forEach(b => {
-  b.addEventListener("click", () => {
-    const kind = b.dataset.kind || "shared";
-    const next = !galleryMineOnly[kind];
-    galleryMineOnly[kind] = next;
-    b.setAttribute("aria-pressed", next ? "true" : "false");
-    loadGalleryFor(kind, 1);
-  });
+archivePaginator.addEventListener("click", e => {
+  const b = e.target.closest("button[data-page]");
+  if (!b || b.disabled) return;
+  const p = +b.dataset.page;
+  if (!Number.isFinite(p)) return;
+  loadArchive(p);
+  document.querySelector(".gallery-section").scrollIntoView({behavior: "smooth", block: "start"});
 });
 
 async function loadPalettes() {
@@ -1073,7 +942,7 @@ document.querySelector("#newChat").addEventListener("click", async () => {
     window.SBTutorial.build(emptyState, { onTryIt: tutorialTryIt, onSearchDemo: tutorialSearchDemo });
   }
   render((await post("/api/new")).events);
-  loadGallery(1);
+  loadArchive(1);
 });
 
 // Tutorial carousel: live hero (replaces the old empty-state copy) + Help modal.
@@ -1202,7 +1071,7 @@ saveBtn.addEventListener("click", async () => {
   try {
     const r = await post("/api/save");
     render(r.events);
-    loadGalleryFor("archive", 1);
+    loadArchive(1);
   } catch (err) { add("error", err.message); }
   finally { saveBtn.disabled = false; saveBtn.classList.remove("loading"); }
 });
@@ -1250,7 +1119,6 @@ toggleShareQrBtn?.addEventListener("click", () => {
   shareQrWrap.hidden = !showing;
   toggleShareQrBtn.setAttribute("aria-pressed", String(showing));
 });
-document.querySelector("#shareConfirm").addEventListener("click", async () => render((await post("/api/share", {title:shareTitle.value, artist:shareArtist.value})).events));
 
 function openLinkModal(url, qrUrl, shareId) {
   linkModalUrl.value = url || "";
@@ -1264,17 +1132,12 @@ document.querySelectorAll('[data-close="linkModal"]').forEach(b => b.addEventLis
 async function handleGalleryAction(e) {
   const delBtn = e.target.closest("button.gc-delete-btn");
   if (delBtn) {
-    const kind = delBtn.dataset.kind || "shared";
     const poolHash = delBtn.dataset.poolHash || "";
-    const prompt = kind === "shared"
-      ? "Remove this canvas from the shared gallery?"
-      : "Remove this canvas from your archive?";
-    if (!poolHash || !confirm(prompt)) return;
-    const endpoint = kind === "shared" ? "/api/unshare" : "/api/archive/delete";
+    if (!poolHash || !confirm("Remove this canvas from saved canvases?")) return;
     delBtn.disabled = true;
     try {
-      const r = await post(endpoint, {pool_hash: poolHash});
-      if (r && r.ok) loadGalleryFor(kind, galleryPages[kind]);
+      const r = await post("/api/archive/delete", {pool_hash: poolHash});
+      if (r && r.ok) loadArchive(archivePage);
       else add("error", (r && r.error) || "Could not remove.");
     } catch (err) { add("error", err.message); }
     finally { delBtn.disabled = false; }
@@ -1282,26 +1145,21 @@ async function handleGalleryAction(e) {
   }
   const btn = e.target.closest("button[data-path]");
   if (!btn) return;
-  const kind = btn.dataset.kind || "shared";
   const action = btn.dataset.action || "remix";
   if (action === "link") {
-    // gallery tab uses tile-kind 'shared' but the share-link kind is 'gallery'.
-    const linkKind = kind === "shared" ? "gallery" : "archive";
     try {
-      const r = await post("/api/get_link", {kind: linkKind, path: btn.dataset.path});
+      const r = await post("/api/get_link", {kind: "archive", path: btn.dataset.path});
       if (r && r.ok) openLinkModal(r.url, r.qr_url, r.share_id);
       else add("error", (r && r.error) || "Could not generate link.");
     } catch (err) { add("error", err.message); }
     return;
   }
-  const endpoint = GALLERY_TABS[kind]?.endpoint || "/api/remix";
   scrollTo({top:0, behavior:"smooth"});
   loaderTicketStart();
-  try { render((await post(endpoint, {path: btn.dataset.path})).events); }
+  try { render((await post("/api/archive_remix", {path: btn.dataset.path})).events); }
   catch (err) { add("error", err.message); }
   finally { loaderTicketEnd(); }
 }
-gallery.addEventListener("click", handleGalleryAction);
 archive.addEventListener("click", handleGalleryAction);
 
 async function handleShareDeepLink() {
@@ -1351,4 +1209,4 @@ document.addEventListener("keydown", async (e) => {
 });
 connectEvents();
 const bootingShare = new URLSearchParams(location.search).has("share");
-loadHistory(); loadPalettes(); if (bootingShare) handleShareDeepLink(); else loadCanvas(); loadGallery(1); loadGalleryFor("archive", 1); refreshAccount();
+loadHistory(); loadPalettes(); if (bootingShare) handleShareDeepLink(); else loadCanvas(); loadArchive(1); refreshSettings();

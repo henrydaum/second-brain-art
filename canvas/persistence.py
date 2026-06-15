@@ -85,10 +85,6 @@ def ensure_schema(db) -> None:
                 ON technique_events (image_path, kind, ts);
             """
         )
-        try:
-            db.conn.execute("ALTER TABLE technique_scores ADD COLUMN link_opens INTEGER NOT NULL DEFAULT 0")
-        except Exception:
-            pass
         db.conn.commit()
     logger.info("canvas schema ensured")
 
