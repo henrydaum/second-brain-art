@@ -33,6 +33,8 @@ def _snap_after(cs, render_result) -> dict:
 		"path": str(render_result.image_path),
 		"chain": list(cs.canvas.layers),
 		"size": cs.canvas.size,
+		"width": cs.canvas.width,
+		"height": cs.canvas.height,
 		"palette_id": cs.canvas.palette_id,
 		"canvas_id": cs.canvas_id,
 		"pool_hash": render_result.pool_hash,

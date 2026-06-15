@@ -83,6 +83,21 @@ def ensure_schema(db) -> None:
                 ON technique_events (slug, kind, ts);
             CREATE INDEX IF NOT EXISTS idx_technique_events_image_kind
                 ON technique_events (image_path, kind, ts);
+
+            CREATE TABLE IF NOT EXISTS technique_errors (
+                id               INTEGER PRIMARY KEY AUTOINCREMENT,
+                ts               REAL NOT NULL,
+                slug             TEXT NOT NULL,
+                error_type       TEXT,
+                message          TEXT,
+                technique_lineno INTEGER,
+                technique_line   TEXT,
+                hint             TEXT,
+                params_json      TEXT,
+                session_key      TEXT
+            );
+            CREATE INDEX IF NOT EXISTS idx_technique_errors_slug
+                ON technique_errors (slug, ts);
             """
         )
         db.conn.commit()
