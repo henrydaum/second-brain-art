@@ -41,6 +41,8 @@ class CanvasRuntime:
 		# The canvases themselves survive via canvas_states (when db is set).
 		self._session_to_canvas: dict[str, str] = {}
 		self.db = db
+		if self.db is not None:
+			canvas_persistence.ensure_schema(self.db)
 
 	# ── lifecycle ────────────────────────────────────────────────────────
 

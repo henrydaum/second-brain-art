@@ -230,14 +230,18 @@ class WebFrontend(BaseFrontend):
 
     def _ensure_conversation(self, key: str, *, account_id: str = "") -> None:
         self._ensure_web_profile()
+        self._bind_web_user(key, account_id)
         session = self.runtime.get_session(key)
         if session.conversation_id is not None:
             self._apply_web_scope(key, account_id=account_id)
             return
-        cid = self.runtime.create_conversation("Art conversation", kind="user", category="Art")
+        cid = self.runtime.create_conversation("Art conversation", kind="user", category="Art", user_id=self.runtime.session_user_id(key))
         if cid:
             self.runtime.load_conversation(key, cid, agent_profile="default")
             self._apply_web_scope(key, account_id=account_id)
+
+    def _bind_web_user(self, key: str, account_id: str = "") -> None:
+        self.bind_session(key, account_id or None)
 
     def _ensure_web_profile(self) -> None:
         """Force the two web-frontend profiles into config every startup.

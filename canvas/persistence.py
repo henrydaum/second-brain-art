@@ -20,6 +20,79 @@ from canvas.state import CanvasState
 logger = logging.getLogger("CanvasPersistence")
 
 
+def ensure_schema(db) -> None:
+    """Create the canvas/art tables if they don't exist.
+
+    Canvas owns its own schema (the kernel DB knows nothing about it) — this is
+    called once when the CanvasRuntime is constructed with a db. Covers the
+    canvas editing/persistence tables, the public pool-hash content store, the
+    user→canvas action ledger (saves/shares/etc.), and the technique popularity
+    counters fed by those actions.
+    """
+    if db is None:
+        return
+    with db.lock:
+        db.conn.executescript(
+            """
+            CREATE TABLE IF NOT EXISTS canvas_states (
+                canvas_id  TEXT PRIMARY KEY,
+                state_json TEXT NOT NULL,
+                updated_at REAL NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS canvas_pools (
+                pool_hash  TEXT PRIMARY KEY,
+                state_json TEXT NOT NULL,
+                created_at REAL NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS user_canvas_actions (
+                id        INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id   TEXT NOT NULL,
+                pool_hash TEXT NOT NULL,
+                action    TEXT NOT NULL,
+                ts        REAL NOT NULL,
+                meta_json TEXT
+            );
+            CREATE INDEX IF NOT EXISTS idx_uca_action_pool
+                ON user_canvas_actions (action, pool_hash, ts);
+            CREATE INDEX IF NOT EXISTS idx_uca_user_action
+                ON user_canvas_actions (user_id, action, ts);
+
+            CREATE TABLE IF NOT EXISTS technique_scores (
+                slug        TEXT PRIMARY KEY,
+                shares      INTEGER NOT NULL DEFAULT 0,
+                downloads   INTEGER NOT NULL DEFAULT 0,
+                remixes     INTEGER NOT NULL DEFAULT 0,
+                saves       INTEGER NOT NULL DEFAULT 0,
+                link_opens  INTEGER NOT NULL DEFAULT 0,
+                generations INTEGER NOT NULL DEFAULT 0,
+                updated_at  REAL
+            );
+
+            CREATE TABLE IF NOT EXISTS technique_events (
+                id             INTEGER PRIMARY KEY AUTOINCREMENT,
+                ts             REAL NOT NULL,
+                kind           TEXT NOT NULL,
+                slug           TEXT NOT NULL,
+                image_path     TEXT,
+                chain_position TEXT,
+                weight         REAL NOT NULL DEFAULT 0
+            );
+            CREATE INDEX IF NOT EXISTS idx_technique_events_slug_kind
+                ON technique_events (slug, kind, ts);
+            CREATE INDEX IF NOT EXISTS idx_technique_events_image_kind
+                ON technique_events (image_path, kind, ts);
+            """
+        )
+        try:
+            db.conn.execute("ALTER TABLE technique_scores ADD COLUMN link_opens INTEGER NOT NULL DEFAULT 0")
+        except Exception:
+            pass
+        db.conn.commit()
+    logger.info("canvas schema ensured")
+
+
 def save(db, cs: CanvasState) -> None:
 	"""Upsert one CanvasState into the ``canvas_states`` table."""
 	now = time.time()

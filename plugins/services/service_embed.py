@@ -230,7 +230,7 @@ def build_services(config: dict) -> dict:
             chunk_size=config.get("embed_chunk_size", 512),
         ),
         "image_embedder": SentenceTransformerEmbedder(
-            model_name=config.get("embed_image_model_name", "clip-ViT-L-14"),
+            model_name=config.get("embed_image_model_name", "clip-ViT-B-32"),
             use_cuda=config.get("embed_use_cuda", False),
             chunk_size=config.get("embed_chunk_size", 512),
         ),

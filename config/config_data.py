@@ -15,7 +15,7 @@ Each entry: (title, variable_name, description, default, type_info)
                    {"type": "slider", "range": (min, max, divisions), "is_float": bool}
 """
 
-from paths import DATA_DIR, ATTACHMENT_CACHE
+from paths import ROOT_DIR, DATA_DIR, ATTACHMENT_CACHE
 
 # The kernel ships Timekeeper as the lightweight event clock, but no scheduled
 # jobs. Store packages register their own jobs when they need recurring work.
@@ -25,7 +25,12 @@ SETTINGS_DATA = [
     # --- Directories ---
     ("Sync Directories", "sync_directories",
      "Folders to monitor for new and changed files. Sub-folders are included.",
-     [str(ATTACHMENT_CACHE)],
+     [
+        str(ATTACHMENT_CACHE),
+        str(ROOT_DIR / "plugins" / "techniques"),
+        str(DATA_DIR / "sandbox_plugins" / "techniques"),
+        str(DATA_DIR / "installed_plugins" / "techniques"),
+    ],
      {"type": "path_list"}),
 
     ("Database Path", "db_path",
@@ -57,14 +62,14 @@ SETTINGS_DATA = [
     # --- Services ---
     ("Auto-load Services", "autoload_services",
      "Managed service names to load automatically on startup. Extension services auto-load when installed.",
-     ["llm", "timekeeper"],
+     ["llm", "timekeeper", "text_embedder"],
      {"type": "json_list"}),
 
     # --- Frontends ---
     ("Enabled Frontends", "enabled_frontends",
      "Frontend modules to start on launch. The kernel ships only the REPL; "
      "the Telegram frontend is installable from the store. Requires app restart.",
-     ["repl"],
+     ["repl", "web"],
      {"type": "json_list"}),
 
     # --- Processing ---

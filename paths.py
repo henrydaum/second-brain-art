@@ -16,11 +16,11 @@ ROOT_DIR = Path(__file__).parent
 # Mutable user data: database, model cache, config, credentials
 _system = platform.system()
 if _system == "Windows":
-    DATA_DIR = Path(os.getenv("LOCALAPPDATA", "")) / "Second Brain"
+    DATA_DIR = Path(os.getenv("LOCALAPPDATA", "")) / "Second Brain Art"
 elif _system == "Darwin":
-    DATA_DIR = Path.home() / "Library" / "Application Support" / "Second Brain"
+    DATA_DIR = Path.home() / "Library" / "Application Support" / "Second Brain Art"
 else:
-    DATA_DIR = Path(os.getenv("XDG_DATA_HOME", Path.home() / ".local" / "share")) / "Second Brain"
+    DATA_DIR = Path(os.getenv("XDG_DATA_HOME", Path.home() / ".local" / "share")) / "Second Brain Art"
 
 # Mirrored plugin trees. ``plugins/`` in the repo is the kernel/bundled tree;
 # these DATA_DIR trees hold agent drafts and installed optional plugins.
