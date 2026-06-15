@@ -20,15 +20,15 @@ class TiltShiftTechnique(BaseTechnique):
 
     def run(self, canvas):
         img = canvas.image.convert("RGB")
-        s = canvas.size
+        W, H = canvas.width, canvas.height
         blurred = img.filter(ImageFilter.GaussianBlur(float(self.max_blur)))
-        yy = np.arange(s).astype(np.float32) / max(1, s - 1)
+        yy = np.arange(H).astype(np.float32) / max(1, H - 1)
         d = np.abs(yy - float(self.focus_y))
         edge0 = float(self.focus_band) / 2.0
         edge1 = edge0 + 0.15
         t = np.clip((d - edge0) / max(1e-6, edge1 - edge0), 0.0, 1.0)
         smooth = (t * t * (3.0 - 2.0 * t))
-        mask_strip = (smooth * 255.0).astype(np.uint8).reshape(s, 1)
-        mask = Image.fromarray(mask_strip, "L").resize((s, s), Image.NEAREST)
+        mask_strip = (smooth * 255.0).astype(np.uint8).reshape(H, 1)
+        mask = Image.fromarray(mask_strip, "L").resize((W, H), Image.NEAREST)
         out = Image.composite(blurred, img, mask)
         canvas.commit(out.convert("RGBA"))

@@ -101,7 +101,10 @@ class Canvas:
         p = job["palette"]
         colors = {k: ColorValue(v) for k, v in p["colors"].items()}
         self.palette = SimpleNamespace(**colors, id=p["id"], name=p["name"], kind=p["kind"], colors=colors)
-        self.size = self.width = self.height = int(job["size"])
+        # Real dimensions; ``size`` is a legacy alias = the long edge.
+        self.width = int(job["width"])
+        self.height = int(job["height"])
+        self.size = max(self.width, self.height)
         self.seed = int(job["seed"])
         self.kind = str(job.get("kind") or "background")
         self._image = Image.open(job["input_image_path"]).convert("RGBA") if job.get("input_image_path") else None
@@ -116,7 +119,7 @@ class Canvas:
     def new(self, w=None, h=None, color=None):
         if isinstance(w, str) and h is None and color is None:
             color, w = w, None
-        return Image.new("RGBA", (int(w or self.size), int(h or w or self.size)), color or self.palette.background)
+        return Image.new("RGBA", (int(w or self.width), int(h if h is not None else (w if w is not None else self.height))), color or self.palette.background)
 
     def create_image(self, color=None):
         return self.new(color=color or self.palette.background)
@@ -126,7 +129,7 @@ class Canvas:
         starting point for an object technique. The framework alpha-composites
         whatever you commit onto the prior canvas, so paint only what you
         want visible."""
-        return Image.new("RGBA", (int(w or self.size), int(h or w or self.size)), (0, 0, 0, 0))
+        return Image.new("RGBA", (int(w or self.width), int(h if h is not None else (w if w is not None else self.height))), (0, 0, 0, 0))
 
     def commit(self, image):
         self._committed = image.convert("RGBA")
@@ -344,6 +347,24 @@ def _validate_output(img: Image.Image, canvas: "Canvas") -> dict | None:
     return None
 
 
+def _conform_to_canvas(img: Image.Image, width: int, height: int) -> Image.Image:
+    """Force ``img`` to exactly ``width × height``.
+
+    The output-fit safety net: techniques that build their image from
+    ``canvas.new()``/``new_layer()`` already match (no-op). Techniques that
+    hard-code a square from the legacy ``canvas.size`` (the long edge) get
+    **center-cropped** to the canvas aspect; anything smaller is centered on
+    transparent padding. This guarantees every layer's output is the canvas
+    shape, so the chain composites cleanly on any aspect ratio."""
+    if img.width == width and img.height == height:
+        return img
+    src = img.convert("RGBA")
+    out = Image.new("RGBA", (int(width), int(height)), (0, 0, 0, 0))
+    # Center the source; negative offsets clip (crop), positive ones pad.
+    out.paste(src, ((int(width) - src.width) // 2, (int(height) - src.height) // 2))
+    return out
+
+
 def _write_sidecar(output_image_path: str, payload: dict) -> None:
     try:
         Path(output_image_path + ".err.json").write_text(json.dumps(payload), encoding="utf-8")
@@ -482,8 +503,12 @@ def _run_job(job: dict) -> int:
             canvas.commit(result)
         if canvas._committed is None:
             raise ValueError("technique did not call canvas.commit(image)")
+        # Output-fit net: conform the committed layer to the canvas aspect so
+        # the composite below and the chain's next layer always line up.
+        canvas._committed = _conform_to_canvas(canvas._committed, canvas.width, canvas.height)
         if canvas.kind == "object" and canvas._image is not None:
-            final_image = Image.alpha_composite(canvas._image, canvas._committed)
+            prior = _conform_to_canvas(canvas._image, canvas.width, canvas.height)
+            final_image = Image.alpha_composite(prior, canvas._committed)
         else:
             final_image = canvas._committed
         final_image.save(output_image_path, "PNG", compress_level=int(job.get("png_compress_level", 1)))

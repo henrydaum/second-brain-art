@@ -18,17 +18,17 @@ class VoronoiCrystallizeTechnique(BaseTechnique):
 
     def run(self, canvas):
         n = int(self.cells)
-        s = canvas.size
         arr = canvas.image_array(mode="RGB", dtype="uint8")
+        H, W = arr.shape[:2]
         rng = np.random.default_rng(canvas.seed)
-        seeds_x = rng.integers(0, s, size=n)
-        seeds_y = rng.integers(0, s, size=n)
+        seeds_x = rng.integers(0, W, size=n)
+        seeds_y = rng.integers(0, H, size=n)
         seed_colors = arr[seeds_y, seeds_x]
         out = np.empty_like(arr)
         chunk = max(1, 32 if n > 600 else 64)
-        yy, xx = np.mgrid[0:s, 0:s].astype(np.float32)
-        for y0 in range(0, s, chunk):
-            y1 = min(s, y0 + chunk)
+        yy, xx = np.mgrid[0:H, 0:W].astype(np.float32)
+        for y0 in range(0, H, chunk):
+            y1 = min(H, y0 + chunk)
             dx = xx[y0:y1, ..., None] - seeds_x[None, None, :]
             dy = yy[y0:y1, ..., None] - seeds_y[None, None, :]
             idx = np.argmin(dx * dx + dy * dy, axis=-1)

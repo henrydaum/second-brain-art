@@ -18,14 +18,14 @@ class LowPolyTechnique(BaseTechnique):
     jitter = Slider(0.0, 0.9, default=0.45, step=0.05)
 
     def run(self, canvas):
-        s = int(canvas.size)
         cols = int(self.cells)
         jit = float(self.jitter)
         rng = np.random.default_rng(int(canvas.seed))
 
         src = canvas.image_array(mode="RGB", dtype="uint8")
-        step = s / cols
-        rows = int(s / step) + 2
+        H, W = src.shape[:2]
+        step = W / cols
+        rows = int(H / step) + 2
 
         # Build a jittered point lattice; clamp the border so we cover edges.
         pts = {}
@@ -33,19 +33,19 @@ class LowPolyTechnique(BaseTechnique):
             for i in range(cols + 2):
                 x = (i - 0.5) * step
                 y = j * step
-                if 0 < x < s and 0 < y < s:
+                if 0 < x < W and 0 < y < H:
                     x += (rng.random() - 0.5) * step * jit
                     y += (rng.random() - 0.5) * step * jit
                 pts[(i, j)] = (x, y)
 
-        img = Image.new("RGBA", (s, s), tuple(int(c) for c in src[0, 0]) + (255,))
+        img = Image.new("RGBA", (W, H), tuple(int(c) for c in src[0, 0]) + (255,))
         draw = ImageDraw.Draw(img, "RGBA")
 
         def sample(tri):
             cx = sum(p[0] for p in tri) / 3.0
             cy = sum(p[1] for p in tri) / 3.0
-            ix = min(max(int(cx), 0), s - 1)
-            iy = min(max(int(cy), 0), s - 1)
+            ix = min(max(int(cx), 0), W - 1)
+            iy = min(max(int(cy), 0), H - 1)
             return tuple(int(c) for c in src[iy, ix]) + (255,)
 
         for j in range(rows):

@@ -28,8 +28,8 @@ class AsciiConverterTechnique(BaseTechnique):
     bg = Enum([("black", "Black"), ("white", "White"), ("palette_bg", "Palette BG")], default="black")
 
     def run(self, canvas):
-        s = canvas.size
         arr = canvas.image_array(mode="RGB", dtype="float")
+        H, W = arr.shape[:2]
         lum = arr[..., 0] * 0.2126 + arr[..., 1] * 0.7152 + arr[..., 2] * 0.0722
 
         cell = int(self.cell_px)
@@ -37,11 +37,11 @@ class AsciiConverterTechnique(BaseTechnique):
         nramp = len(ramp)
 
         bg_hex = {"black": "#0a0a0a", "white": "#fafafa", "palette_bg": canvas.palette.background}[str(self.bg)]
-        img = Image.new("RGBA", (s, s), bg_hex)
+        img = Image.new("RGBA", (W, H), bg_hex)
         draw = ImageDraw.Draw(img, "RGBA")
 
-        cols = s // cell
-        rows = s // cell
+        cols = W // cell
+        rows = H // cell
         for r in range(rows):
             y0 = r * cell
             y1 = y0 + cell

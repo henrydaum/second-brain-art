@@ -11,8 +11,12 @@ The implementation contract (sandbox rules, the `canvas` surface, every
 the contract and just need the math.
 
 Do not copy snippets verbatim. Adapt for palette, composition, and the
-canvas size you're rendering into. Every color in the final technique must
-trace back to a palette slot or `art_kit.palette_color(t)`.
+canvas dimensions you're rendering into. The canvas is **not always square** —
+build grids and place focal points from `canvas.width`/`canvas.height` (and
+center on `(width/2, height/2)`), not a single side length. Snippets here that
+take a scalar `size` assume a square; generalize them to width×height when the
+canvas aspect isn't 1:1. Every color in the final technique must trace back to
+a palette slot or `art_kit.palette_color(t)`.
 
 ### §1 Fractals
 

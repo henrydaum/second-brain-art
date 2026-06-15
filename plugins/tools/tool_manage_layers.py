@@ -24,6 +24,8 @@ def _snap_after(cs, render_result) -> dict:
 			"path": None,
 			"chain": list(cs.canvas.layers),
 			"size": cs.canvas.size,
+			"width": cs.canvas.width,
+			"height": cs.canvas.height,
 			"palette_id": cs.canvas.palette_id,
 			"canvas_id": cs.canvas_id,
 		}

@@ -93,7 +93,15 @@ Techniques run in an isolated subprocess. Inside run(), you get:
                      tertiary, accent, background. Each slot is a hex
                      string ("#RRGGBB") that also behaves as an RGB tuple.
   canvas.palette.colors                       dict of all five slots.
-  canvas.size / .width / .height              square dimension in pixels.
+  canvas.width / .height                      canvas dimensions in pixels.
+                                              The canvas is NOT always square —
+                                              build pixel grids from width×height
+                                              and center on (width/2, height/2).
+  canvas.size                                 legacy scalar = the LONG edge
+                                              (max(width, height)). Fine for
+                                              radii/stroke scaling, but do not
+                                              use it as both axes on a non-square
+                                              canvas — reach for width/height.
   canvas.seed                                 int — seed every RNG.
   canvas.image                                (filter/object only) copy of
                                               the current canvas image.
@@ -103,14 +111,18 @@ Techniques run in an isolated subprocess. Inside run(), you get:
                                               dtype="float" → float32 in
                                               [0,1]; dtype="uint8" → raw.
   canvas.new(color=...)                       fresh RGBA image at canvas
-                                              size.
+                                              size (width×height).
   canvas.create_image(color=...)              shorthand for
                                               new(color=palette.background).
                                               Backgrounds.
   canvas.new_layer()                          fully-transparent RGBA at
-                                              canvas size. Objects.
+                                              canvas size (width×height). Objects.
   canvas.commit(image)                        **REQUIRED** — call once at
-                                              the end with an RGBA image.
+                                              the end with an RGBA image. If it
+                                              isn't exactly width×height it is
+                                              center-cropped/padded to fit, so
+                                              prefer canvas.new()/new_layer() to
+                                              get the right shape from the start.
   canvas.commit_array(arr)                    same as commit, for numpy
                                               HxWxC arrays (float in [0,1]
                                               or uint8; C=3 or 4). Handles

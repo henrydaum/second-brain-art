@@ -22,18 +22,18 @@ class DepthFogTechnique(BaseTechnique):
     strength  = Slider(0.0, 1.0, default=0.55, step=0.05)
 
     def run(self, canvas):
-        s = canvas.size
         arr = canvas.image_array(mode="RGB", dtype="float") * 255.0
+        H, W = arr.shape[:2]
         bg = np.array(art_kit.hex_to_rgb(canvas.palette.background), dtype=np.float32)
-        ys, xs = np.mgrid[0:s, 0:s].astype(np.float32)
+        ys, xs = np.mgrid[0:H, 0:W].astype(np.float32)
         if self.direction == "top":
-            mask = 1.0 - (ys / max(s - 1, 1))
+            mask = 1.0 - (ys / max(H - 1, 1))
         elif self.direction == "bottom":
-            mask = ys / max(s - 1, 1)
+            mask = ys / max(H - 1, 1)
         else:
-            cx = cy = s / 2.0
+            cx, cy = W / 2.0, H / 2.0
             d = np.sqrt((xs - cx) ** 2 + (ys - cy) ** 2)
-            d_max = np.sqrt(2.0) * cx
+            d_max = np.sqrt(cx ** 2 + cy ** 2)
             mask = np.clip(d / d_max, 0.0, 1.0)
         mask = mask * mask * (3.0 - 2.0 * mask) * float(self.strength)
         mask = mask[..., None]

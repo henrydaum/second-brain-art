@@ -40,6 +40,7 @@ const settingsModal = document.querySelector("#settingsModal");
 const settingsStatus = document.querySelector("#settingsStatus");
 const prefTechniqueAuthoring = document.querySelector("#prefTechniqueAuthoring");
 const prefCommunityTechniques = document.querySelector("#prefCommunityTechniques");
+const aspectPresets = document.querySelector("#aspectPresets");
 const controlsPanel = document.querySelector("#controlsPanel");
 const controlsDrawer = document.querySelector("#controlsDrawer");
 const controlsToggle = document.querySelector("#controlsToggle");
@@ -345,16 +346,99 @@ async function saveSetting(key, value) {
     settingsStatus.textContent = err.message;
   }
 }
-settingsBtn?.addEventListener("click", () => { openModal(settingsModal); refreshSettings(); });
+settingsBtn?.addEventListener("click", () => { openModal(settingsModal); refreshSettings(); syncAspectUI(); });
 prefTechniqueAuthoring?.addEventListener("change", () => saveSetting("technique_authoring_enabled", prefTechniqueAuthoring.checked));
 prefCommunityTechniques?.addEventListener("change", () => saveSetting("community_techniques_enabled", prefCommunityTechniques.checked));
 
+// ----- Aspect ratio (Settings) -----
+// Presets are stored in their landscape (w ≥ h) form; the orientation toggle
+// flips non-square ratios. The backend anchors on the long edge, so picking a
+// ratio re-renders the current chain at the new shape.
+const ASPECT_PRESETS = [
+  {label: "1:1",   w: 1,  h: 1},
+  {label: "5:4",   w: 5,  h: 4},
+  {label: "4:3",   w: 4,  h: 3},
+  {label: "3:2",   w: 3,  h: 2},
+  {label: "16:10", w: 16, h: 10},
+  {label: "16:9",  w: 16, h: 9},
+  {label: "25:16", w: 25, h: 16},
+  {label: "21:9",  w: 21, h: 9},
+];
+let aspectOrient = "landscape";
+if (aspectPresets) {
+  aspectPresets.innerHTML = ASPECT_PRESETS.map((p, i) =>
+    `<button type="button" class="aspect-chip" data-i="${i}">${p.label}</button>`).join("");
+}
+function presetRatioFor(p) {
+  if (p.w === p.h) return [1, 1];
+  return aspectOrient === "portrait" ? [p.h, p.w] : [p.w, p.h];
+}
+function updateOrientButtons() {
+  document.querySelectorAll(".aspect-orient-btn").forEach(b =>
+    b.classList.toggle("is-active", b.dataset.orient === aspectOrient));
+}
+function highlightActiveChip() {
+  if (!aspectPresets) return;
+  const w = currentCanvasWidth, h = currentCanvasHeight;
+  const curRatio = (w && h) ? Math.max(w, h) / Math.min(w, h) : 0;
+  aspectPresets.querySelectorAll(".aspect-chip").forEach(chip => {
+    const p = ASPECT_PRESETS[Number(chip.dataset.i)];
+    const pr = Math.max(p.w, p.h) / Math.min(p.w, p.h);
+    chip.classList.toggle("is-active", !!curRatio && Math.abs(pr - curRatio) < 0.02);
+  });
+}
+// Called when the live canvas changes: derive orientation from the canvas so the
+// toggle reflects reality, then repaint button + chip highlights.
+function syncAspectUI() {
+  const w = currentCanvasWidth, h = currentCanvasHeight;
+  if (w && h) {
+    if (w > h) aspectOrient = "landscape";
+    else if (h > w) aspectOrient = "portrait";
+  }
+  updateOrientButtons();
+  highlightActiveChip();
+}
+async function postAspect(rw, rh) {
+  try {
+    const r = await post("/api/set_aspect", {ratio_w: rw, ratio_h: rh});
+    if (r?.events) render(r.events);
+  } catch (err) { add("error", err.message); }
+}
+function applyAspect(p) {
+  const [rw, rh] = presetRatioFor(p);
+  postAspect(rw, rh);
+}
+// Orientation toggle: set the intent, and if the canvas is already non-square,
+// immediately flip it into the chosen orientation. (A square has no orientation,
+// so we just record the intent for the next preset pick.)
+function applyOrientation(orient) {
+  aspectOrient = orient === "portrait" ? "portrait" : "landscape";
+  updateOrientButtons();
+  const w = currentCanvasWidth, h = currentCanvasHeight;
+  if (w && h && w !== h) {
+    const lo = Math.max(w, h), sh = Math.min(w, h);
+    const [rw, rh] = aspectOrient === "portrait" ? [sh, lo] : [lo, sh];
+    postAspect(rw, rh);
+  }
+}
+aspectPresets?.addEventListener("click", e => {
+  const chip = e.target.closest(".aspect-chip");
+  if (chip) applyAspect(ASPECT_PRESETS[Number(chip.dataset.i)]);
+});
+document.querySelectorAll(".aspect-orient-btn").forEach(b =>
+  b.addEventListener("click", () => applyOrientation(b.dataset.orient)));
+
 // ----- Canvas + theming -----
-let currentCanvasSize = 0;     // tracks live canvas dimension for download tier labels
+let currentCanvasSize = 0;     // tracks live canvas long edge for download tier labels
+let currentCanvasWidth = 0;    // live canvas width  (for non-square aspect)
+let currentCanvasHeight = 0;   // live canvas height (for non-square aspect)
 let currentCanvasHasImage = false;
 function setCanvas(c) {
   currentCanvasSize = Number(c?.size) || 0;
+  currentCanvasWidth = Number(c?.width) || currentCanvasSize;
+  currentCanvasHeight = Number(c?.height) || currentCanvasSize;
   currentCanvasHasImage = !!c?.url;
+  syncAspectUI();
   if (headerCanvasActions) headerCanvasActions.hidden = !currentCanvasHasImage;
   if (!c?.url) {
     showcase.classList.remove("has-image");
@@ -945,13 +1029,23 @@ if (helpBtn && helpModal && helpModalBody && window.SBTutorial) {
   });
 }
 
+const DOWNLOAD_LONG_CAP = 8192;
+// Scale (w, h) by `scale`, clamping the long edge to DOWNLOAD_LONG_CAP and the
+// short edge to a 64px floor — mirrors render_for_download on the backend.
+function downloadDimsForScale(scale) {
+  const w0 = currentCanvasWidth > 0 ? currentCanvasWidth : (currentCanvasSize || 1024);
+  const h0 = currentCanvasHeight > 0 ? currentCanvasHeight : (currentCanvasSize || 1024);
+  let w = Math.round(w0 * scale), h = Math.round(h0 * scale);
+  const long = Math.max(w, h);
+  if (long > DOWNLOAD_LONG_CAP) { const f = DOWNLOAD_LONG_CAP / long; w = Math.round(w * f); h = Math.round(h * f); }
+  return [Math.max(64, w), Math.max(64, h)];
+}
 function refreshDownloadTierLabels() {
-  const s = currentCanvasSize > 0 ? currentCanvasSize : 1024;
   downloadPanel.querySelectorAll(".dp-size-btn").forEach(btn => {
     const scale = Number(btn.dataset.scale) || 1;
-    const px = Math.max(64, Math.min(4096, Math.round(s * scale)));
+    const [w, h] = downloadDimsForScale(scale);
     const dims = btn.querySelector(".dp-size-dims");
-    if (dims) dims.textContent = `${px} × ${px}`;
+    if (dims) dims.textContent = `${w} × ${h}`;
   });
 }
 function setDownloadPanelOpen(open) {

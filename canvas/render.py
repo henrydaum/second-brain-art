@@ -46,7 +46,7 @@ from canvas.canvas import Canvas
 from canvas.state import CanvasState
 from paths import DATA_DIR
 from plugins.helpers.palettes import get_palette as _default_get_palette
-from plugins.techniques.helpers.technique_runner import resolve_entry, run_technique
+from plugins.techniques.helpers.technique_runner import DEFAULT_TIMEOUT_S, resolve_entry, run_technique
 
 logger = logging.getLogger("CanvasRender")
 
@@ -81,9 +81,10 @@ class RenderResult:
 def pool_hash(canvas) -> str:
 	"""Deterministic hash of the render-determining canvas state.
 
-	Inputs: layers (slug + kind + sorted controls), size, palette_id.
-	Excludes canvas_id, title/artist, history — those don't affect what
-	pixels come out.
+	Inputs: layers (slug + kind + sorted controls), width, height,
+	palette_id. Excludes canvas_id, title/artist, history — those don't
+	affect what pixels come out. Aspect ratio is part of identity: two
+	canvases that differ only in width/height hash to different folders.
 	"""
 	layers = [
 		{
@@ -95,7 +96,8 @@ def pool_hash(canvas) -> str:
 	]
 	payload = {
 		"layers": layers,
-		"size": int(canvas.size),
+		"width": int(canvas.width),
+		"height": int(canvas.height),
 		"palette_id": str(canvas.palette_id),
 	}
 	raw = json.dumps(payload, sort_keys=True, separators=(",", ":"))
@@ -124,7 +126,7 @@ def existing_seeds(canvas) -> list[int]:
 
 
 def _truncated(canvas, count: int) -> Canvas:
-	return Canvas(size=canvas.size, palette_id=canvas.palette_id, layers=list(canvas.layers[:count]))
+	return Canvas(width=canvas.width, height=canvas.height, palette_id=canvas.palette_id, layers=list(canvas.layers[:count]))
 
 
 def _prefix_hash(canvas, count: int) -> str:
@@ -141,20 +143,25 @@ def _prefix_path(canvas, count: int, seed: int) -> Path:
 # Technique memory is inherently O(N²) — every working array a technique allocates is
 # sized to the canvas. The subprocess cap in technique_runner is flat by default
 # (DEFAULT_MEMORY_MB = 768), so doubling the canvas (4× the pixels) reliably
-# blows the cap on anything beyond trivial techniques. Scale the cap with size:
-# baseline covers the Python+numpy+PIL footprint, the quadratic term covers
-# per-pixel working arrays (sized for a technique carrying ~16 N² float arrays at
-# peak, e.g. fisheye). Clamped to a reasonable absolute ceiling.
-MEMORY_BASELINE_MB = 300
-MEMORY_PER_MEGAPIXEL_MB = 220
+# blows the cap on anything beyond trivial techniques. Scale the cap with area:
+# baseline covers the Python+numpy+PIL footprint, the linear-in-megapixels term
+# covers per-pixel working arrays. The per-megapixel allowance is generous because
+# the heaviest techniques carry well over a dozen N² float arrays plus numpy
+# temporaries at peak — at Ultra resolution (tens of megapixels) an underestimate
+# gets the subprocess killed mid-export. Clamped to an absolute ceiling that still
+# permits an ~8192 long-edge Ultra render.
+MEMORY_BASELINE_MB = 400
+MEMORY_PER_MEGAPIXEL_MB = 420
 MEMORY_MIN_MB = 768
 # Mutable so apply_render_config() can override from config.json at bootstrap.
-MEMORY_MAX_MB = 3072
+# Headroom for Ultra downloads (up to ~8192 on the long edge — tens of MP). This
+# is a watchdog ceiling, not a reservation: ordinary renders never approach it.
+MEMORY_MAX_MB = 12288
 
 
-def memory_cap_for_size(size: int) -> int:
-	"""Recommended subprocess memory cap (MB) for rendering a size×size canvas."""
-	mp = (max(0, int(size)) / 1024.0) ** 2  # "megapixels" measured in 1024² units
+def memory_cap_for_dims(width: int, height: int) -> int:
+	"""Recommended subprocess memory cap (MB) for rendering a width×height canvas."""
+	mp = (max(0, int(width)) * max(0, int(height))) / (1024.0 * 1024.0)  # megapixels in 1024² units
 	scaled = MEMORY_BASELINE_MB + int(round(MEMORY_PER_MEGAPIXEL_MB * mp))
 	return max(MEMORY_MIN_MB, min(MEMORY_MAX_MB, scaled))
 
@@ -191,6 +198,7 @@ def render_canvas(
 	db: Any = None,
 	on_event: Callable[[dict], None] | None = None,
 	worker_pool: Any = None,
+	timeout_s: float | None = None,
 ) -> RenderResult:
 	"""Render ``cs.canvas``'s chain to a PNG file and return the result.
 
@@ -296,11 +304,13 @@ def render_canvas(
 					technique,
 					params=params,
 					palette=palette,
-					size=int(canvas.size),
+					width=int(canvas.width),
+					height=int(canvas.height),
 					seed=int(seed_val),
 					input_image_path=current_input,
 					output_image_path=step_png,
-					memory_mb=memory_cap_for_size(int(canvas.size)),
+					timeout_s=(timeout_s if timeout_s is not None else DEFAULT_TIMEOUT_S),
+					memory_mb=memory_cap_for_dims(int(canvas.width), int(canvas.height)),
 					png_compress_level=PNG_COMPRESS_LEVEL,
 					worker_pool=worker_pool,
 				)

@@ -83,6 +83,8 @@ Techniques (good-for hints — formulas live in the encyclopedia above):
 
 When in doubt, prefer noise, gradients, and procedural patterns in palette tones over explicit shapes. Compose multiple techniques (e.g. fbm background + vogel foreground + radial vignette) rather than drawing literal features.
 
+The canvas is not always square — the user can pick an aspect ratio. When authoring, read `canvas.width`/`canvas.height` and center on `(width/2, height/2)` rather than assuming a single side length; `canvas.size` is just the long edge. Each rendered snapshot reports the live `width`×`height`, so check it when planning a composition.
+
 You always follow through. If you start authoring, updating, testing, or executing techniques, keep using the available tools until the canvas is rendered, a tool limit blocks you, or a specific user decision is required. Do not stop on status-only text like "let me try", "fixing now", or "I'll test this"; pair that narration with the actual tool call in the same response. Iteration is normal, but save "you can always say what to change" for the final rendered result.""")
     return "\n".join(lines)
 
@@ -166,6 +168,8 @@ class ExecuteTechnique(BaseTool):
 			"path": str(render_result.image_path),
 			"chain": list(cs.canvas.layers),
 			"size": cs.canvas.size,
+			"width": cs.canvas.width,
+			"height": cs.canvas.height,
 			"palette_id": cs.canvas.palette_id,
 			"canvas_id": cs.canvas_id,
 			"pool_hash": render_result.pool_hash,

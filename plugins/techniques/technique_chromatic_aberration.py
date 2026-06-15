@@ -25,7 +25,7 @@ class ChromaticAberrationTechnique(BaseTechnique):
         g = arr[..., 1]
         b = arr[..., 2]
         if self.radial:
-            xx, yy, nx, ny = art_kit.centered_grid(canvas.size)
+            xx, yy, nx, ny = art_kit.centered_grid(canvas.width, canvas.height)
             length = np.sqrt(nx * nx + ny * ny) + 1e-6
             ux = nx / length
             uy = ny / length

@@ -28,10 +28,10 @@ class AtmosphericHazeTechnique(BaseTechnique):
     strength  = Slider(0.0, 1.0, default=0.45, step=0.05)
 
     def run(self, canvas):
-        s = canvas.size
         arr = canvas.image_array(mode="RGB", dtype="float") * 255.0
+        H, W = arr.shape[:2]
         bg = np.array(art_kit.hex_to_rgb(canvas.palette.background), dtype=np.float32)
-        ys = np.linspace(0.0, 1.0, s, dtype=np.float32)
+        ys = np.linspace(0.0, 1.0, H, dtype=np.float32)
         if self.direction == "top":
             mask = 1.0 - ys
         elif self.direction == "bottom":
@@ -41,7 +41,7 @@ class AtmosphericHazeTechnique(BaseTechnique):
             mask = np.clip(mask, 0.0, 1.0)
             mask = 1.0 - mask
         mask = mask * mask * (3.0 - 2.0 * mask) * float(self.strength)
-        mask2d = np.broadcast_to(mask[:, None], (s, s)).astype(np.float32)
+        mask2d = np.broadcast_to(mask[:, None], (H, W)).astype(np.float32)
         arr = _desaturate(arr, mask2d * 0.6)
         mask3 = mask2d[..., None]
         out = arr * (1.0 - mask3) + bg[None, None, :] * mask3

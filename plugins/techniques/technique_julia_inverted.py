@@ -32,7 +32,7 @@ class JuliaExplorerTechnique(BaseTechnique):
 
     def run(self, canvas):
         jx, jy, zoom_exp, detail = _SPOTS.get(str(self.spot), _SPOTS["dragon"])
-        s = int(canvas.size)
+        W, H = int(canvas.width), int(canvas.height)
         zoom = float(2.0 ** zoom_exp)
         n_iter = int(detail)
 
@@ -45,15 +45,20 @@ class JuliaExplorerTechnique(BaseTechnique):
 
         view = 4.0 / zoom
         half = view * 0.5
-        re = np.linspace(-half, half, s, dtype=real)
-        im = np.linspace(-half, half, s, dtype=real)
-        R, I = np.meshgrid(re, im)
+        # Native at the canvas aspect: long edge spans the full half-view, short
+        # edge proportionally less, so pixels stay square (no crop).
+        long_edge = max(W, H)
+        half_x = half * W / long_edge
+        half_y = half * H / long_edge
+        re = np.linspace(-half_x, half_x, W, dtype=real)
+        im = np.linspace(-half_y, half_y, H, dtype=real)
+        R, I = np.meshgrid(re, im)  # both (H, W)
 
         er2 = max(abs(c_scalar), 2.0) ** 2
         initial_abs2 = (R * R + I * I).ravel()
         escapes_now = initial_abs2 > er2
 
-        N = s * s
+        N = W * H
         out_flat = np.zeros(N, dtype=np.float64)
         inv_log2 = 1.0 / np.log(2.0)
         if escapes_now.any():
@@ -109,9 +114,9 @@ class JuliaExplorerTechnique(BaseTechnique):
         idx_lut = np.clip((t * (LUT_SIZE - 1)).astype(np.int32), 0, LUT_SIZE - 1)
         # Invert: flip the LUT index so colors are reversed
         idx_lut = (LUT_SIZE - 1) - idx_lut
-        rgb = lut[idx_lut].reshape(s, s, 3)
+        rgb = lut[idx_lut].reshape(H, W, 3)
 
         bg = np.array(art_kit.hex_to_rgb(canvas.palette.background), dtype=np.uint8)
-        rgb[inside_flat.reshape(s, s)] = bg
+        rgb[inside_flat.reshape(H, W)] = bg
 
         canvas.commit(Image.fromarray(rgb, "RGB").convert("RGBA"))

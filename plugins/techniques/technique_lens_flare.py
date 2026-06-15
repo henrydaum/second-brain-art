@@ -22,20 +22,21 @@ class LensFlareTechnique(BaseTechnique):
     ghosts     = Slider(0, 8, default=5, step=1)
 
     def run(self, canvas):
-        s = int(canvas.size)
         b = float(self.brightness)
-        base = canvas.image_array(mode="RGB", dtype="float")  # (s, s, 3) in [0, 1]
+        base = canvas.image_array(mode="RGB", dtype="float")  # (H, W, 3) in [0, 1]
+        H, W = base.shape[:2]
+        s = max(W, H)  # reference length for distance falloffs
 
-        yy, xx = np.mgrid[0:s, 0:s].astype(np.float32)
-        px, py = float(self.sx) * s, float(self.sy) * s
-        cx = cy = s / 2.0
+        yy, xx = np.mgrid[0:H, 0:W].astype(np.float32)
+        px, py = float(self.sx) * W, float(self.sy) * H
+        cx, cy = W / 2.0, H / 2.0
 
         def tint(t, value=1.0):
             return np.array(
                 art_kit.hex_to_rgb(art_kit.palette_color(t, value)), dtype=np.float32
             ) / 255.0
 
-        flare = np.zeros((s, s, 3), dtype=np.float32)
+        flare = np.zeros((H, W, 3), dtype=np.float32)
 
         # --- Core glow: a very tight core, a medium pool, and a wide soft halo,
         #     each tinted at a different point on the bright end of the ramp.

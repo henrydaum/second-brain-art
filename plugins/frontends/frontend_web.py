@@ -569,6 +569,14 @@ class WebFrontend(BaseFrontend):
             key, "set_palette", {"palette_id": palette_id}, fail_prefix="Palette replay failed",
         )
 
+    def set_aspect(self, session_id: str, ratio_w: float, ratio_h: float) -> list[dict]:
+        """Set the canvas aspect ratio (long-edge anchored) and re-render."""
+        key = self.session_key(session_id)
+        return self._new_canvas_action_events(
+            key, "set_aspect", {"ratio_w": ratio_w, "ratio_h": ratio_h},
+            fail_prefix="Set aspect failed",
+        )
+
     def delete_layer(self, session_id: str, chain_index: int) -> list[dict]:
         """Remove one entry from the chain and re-render. Deleting index 0 clears the canvas."""
         key = self.session_key(session_id)
@@ -690,10 +698,22 @@ class WebFrontend(BaseFrontend):
         if not (scale_f > 0):
             return [{"type": "error", "content": "Download failed: invalid scale"}]
         # Bypass Canvas.set_size's MIN/MAX bounds by constructing directly —
-        # download-time exports may exceed the interactive canvas cap.
-        target = max(64, min(4096, int(round(int(cs.canvas.size) * scale_f))))
+        # download-time exports may exceed the interactive canvas cap. Scale
+        # width/height together (preserving aspect) and clamp the LONG edge to
+        # the Ultra ceiling so an Ultra (4×) export tops out at 8192.
+        DOWNLOAD_LONG_CAP = 8192
+        tw = int(round(int(cs.canvas.width) * scale_f))
+        th = int(round(int(cs.canvas.height) * scale_f))
+        long_edge = max(tw, th)
+        if long_edge > DOWNLOAD_LONG_CAP:
+            f = DOWNLOAD_LONG_CAP / long_edge
+            tw = int(round(tw * f))
+            th = int(round(th * f))
+        target_w = max(64, tw)
+        target_h = max(64, th)
         scaled_canvas = Canvas(
-            size=target,
+            width=target_w,
+            height=target_h,
             palette_id=cs.canvas.palette_id,
             layers=list(cs.canvas.layers),
         )
@@ -705,6 +725,9 @@ class WebFrontend(BaseFrontend):
                 technique_loader=technique_registry.get_record,
                 seed=seed,
                 db=getattr(self.runtime, "db", None),
+                # Ultra renders are big; give them more wall-clock than the
+                # interactive 30s default so they don't time out mid-export.
+                timeout_s=180.0,
                 worker_pool=(getattr(self.runtime, "services", None) or {}).get("technique_worker_pool"),
             ))
         except Exception as e:
@@ -730,8 +753,8 @@ class WebFrontend(BaseFrontend):
             "type": "download_ready",
             "url": _file_url(png_path),
             "name": png_path.name,
-            "width": target,
-            "height": target,
+            "width": target_w,
+            "height": target_h,
             "pool_hash": rr.pool_hash,
         }]
 
@@ -999,7 +1022,7 @@ class WebFrontend(BaseFrontend):
             return {
                 "path": None,
                 "chain": [],
-                "size": cs.canvas.size,
+                "size": cs.canvas.size, "width": cs.canvas.width, "height": cs.canvas.height,
                 "palette_id": cs.canvas.palette_id,
                 "canvas_id": cs.canvas_id,
             }
@@ -1011,10 +1034,10 @@ class WebFrontend(BaseFrontend):
         except Exception as e:
             logger.exception("new canvas render failed for session=%s", session_key)
             return {"path": None, "chain": list(cs.canvas.layers), "error": str(e),
-                    "size": cs.canvas.size, "palette_id": cs.canvas.palette_id, "canvas_id": cs.canvas_id}
+                    "size": cs.canvas.size, "width": cs.canvas.width, "height": cs.canvas.height, "palette_id": cs.canvas.palette_id, "canvas_id": cs.canvas_id}
         if not result.ok:
             return {"path": None, "chain": list(cs.canvas.layers), "error": result.error.message,
-                    "action_error": result.error.to_dict(), "size": cs.canvas.size,
+                    "action_error": result.error.to_dict(), "size": cs.canvas.size, "width": cs.canvas.width, "height": cs.canvas.height,
                     "palette_id": cs.canvas.palette_id, "canvas_id": cs.canvas_id}
         return self._render_snap(cs, rr)
 
@@ -1033,7 +1056,7 @@ class WebFrontend(BaseFrontend):
         return {
             "path": str(rr.image_path),
             "chain": list(cs.canvas.layers),
-            "size": cs.canvas.size,
+            "size": cs.canvas.size, "width": cs.canvas.width, "height": cs.canvas.height,
             "palette_id": cs.canvas.palette_id,
             "canvas_id": cs.canvas_id,
             "pool_hash": rr.pool_hash,
@@ -1063,7 +1086,7 @@ class WebFrontend(BaseFrontend):
         if not getattr(result, "ok", True):
             return [self._canvas_error_event(getattr(result, "error", None), fail_prefix)]
         snap = self._render_snap(cs, rr) if rr is not None else {
-            "path": None, "chain": [], "size": cs.canvas.size,
+            "path": None, "chain": [], "size": cs.canvas.size, "width": cs.canvas.width, "height": cs.canvas.height,
             "palette_id": cs.canvas.palette_id, "canvas_id": cs.canvas_id,
         }
         if not snap.get("path"):
@@ -1313,6 +1336,10 @@ class _Handler(BaseHTTPRequestHandler):
                     return self._json({"ok": False, "error": str(e)}, 400)
             if self.path == "/api/palette":
                 return self._json({"ok": True, "events": self.server.frontend.set_palette(sid, str(body.get("palette_id") or ""))})
+            if self.path == "/api/set_aspect":
+                return self._json({"ok": True, "events": self.server.frontend.set_aspect(
+                    sid, float(body.get("ratio_w") or 1.0), float(body.get("ratio_h") or 1.0),
+                )})
             if self.path == "/api/download":
                 return self._json({"ok": True, "events": self.server.frontend.download(sid)})
             if self.path == "/api/render_for_download":

@@ -19,10 +19,10 @@ class VignetteTechnique(BaseTechnique):
 
     def run(self, canvas):
         arr = canvas.image_array(mode="RGB", dtype="float")
-        s = canvas.size
-        yy, xx = np.mgrid[0:s, 0:s].astype(np.float32)
-        cx = cy = s / 2.0
-        d = np.sqrt((xx - cx) ** 2 + (yy - cy) ** 2) / (s * 0.5 * np.sqrt(2.0))
+        H, W = arr.shape[:2]
+        yy, xx = np.mgrid[0:H, 0:W].astype(np.float32)
+        cx, cy = W / 2.0, H / 2.0
+        d = np.sqrt((xx - cx) ** 2 + (yy - cy) ** 2) / (0.5 * np.sqrt(float(W) ** 2 + float(H) ** 2))
         edge0 = 1.0 - float(self.softness)
         t = np.clip((d - edge0) / max(1e-6, 1.0 - edge0), 0.0, 1.0)
         smooth = t * t * (3.0 - 2.0 * t)

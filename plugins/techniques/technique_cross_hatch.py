@@ -18,15 +18,15 @@ class CrossHatchTechnique(BaseTechnique):
     spacing = Slider(3, 16, default=6, step=1)
 
     def run(self, canvas):
-        s = int(canvas.size)
         sp = float(self.spacing)
         arr = canvas.image_array(mode="RGB", dtype="float")
+        H, W = arr.shape[:2]
         lum = 0.2126 * arr[..., 0] + 0.7152 * arr[..., 1] + 0.0722 * arr[..., 2]
         darkness = np.clip(1.0 - lum, 0.0, 1.0)
 
-        yy, xx = np.mgrid[0:s, 0:s].astype(np.float32)
+        yy, xx = np.mgrid[0:H, 0:W].astype(np.float32)
         lw = max(1.0, sp * 0.32)
-        ink = np.zeros((s, s), dtype=np.float32)
+        ink = np.zeros((H, W), dtype=np.float32)
 
         # Progressively add hatch layers; each kicks in for darker tones.
         passes = [(15.0, 0.20), (75.0, 0.40), (135.0, 0.60), (45.0, 0.80)]

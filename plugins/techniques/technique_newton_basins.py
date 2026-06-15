@@ -39,7 +39,7 @@ class NewtonBasinsExplorerTechnique(BaseTechnique):
     iterations = Slider(0, 1500, default=1500, step=10, label='Iterations')
 
     def run(self, canvas):
-        s = int(canvas.size)
+        W, H = int(canvas.width), int(canvas.height)
         key = str(self.polynomial)
         polys = _polys()
         f, fp, roots, view_half = polys.get(key, polys["cubic"])
@@ -56,12 +56,19 @@ class NewtonBasinsExplorerTechnique(BaseTechnique):
         real = np.float64 if use_f64 else np.float32
 
         half = view_half / zoom_extra
+        # Render natively at the canvas aspect: the longer edge spans the full
+        # half-view, the shorter edge spans proportionally less, so pixels stay
+        # square (no distortion) and the complex plane is framed on center
+        # instead of cropping a square down to the canvas shape.
+        long_edge = max(W, H)
+        re_half = half * W / long_edge
+        im_half = half * H / long_edge
         # Pan offsets the view center; ±1 on the slider moves by a full half-view.
         offset_x = float(self.pan_x) * half
         offset_y = float(self.pan_y) * half
-        re = np.linspace(-half + offset_x, half + offset_x, s, dtype=real)
-        im = np.linspace(-half + offset_y, half + offset_y, s, dtype=real)
-        R, I = np.meshgrid(re, im)
+        re = np.linspace(-re_half + offset_x, re_half + offset_x, W, dtype=real)
+        im = np.linspace(-im_half + offset_y, im_half + offset_y, H, dtype=real)
+        R, I = np.meshgrid(re, im)  # both (H, W)
 
         tol = 1e-4 if not use_f64 else 1e-6
 
@@ -70,7 +77,7 @@ class NewtonBasinsExplorerTechnique(BaseTechnique):
         # <10 iters; only basin boundaries iterate to the cap. Without
         # compaction the full grid of complex arithmetic ran every iter and
         # timed out at s=1024.
-        N = s * s
+        N = W * H
         iters_flat = np.full(N, n_iter, dtype=np.int32)
         converged_flat = np.zeros(N, dtype=bool)
         Z_final = (R + 1j * I).astype(cplx).ravel()
@@ -98,9 +105,9 @@ class NewtonBasinsExplorerTechnique(BaseTechnique):
         if live_idx.size:
             Z_final[live_idx] = Z_live
 
-        Z = Z_final.reshape(s, s)
-        iters = iters_flat.reshape(s, s).astype(np.float32)
-        converged = converged_flat.reshape(s, s)
+        Z = Z_final.reshape(H, W)
+        iters = iters_flat.reshape(H, W).astype(np.float32)
+        converged = converged_flat.reshape(H, W)
 
         # For polynomials with known roots, classify by nearest root.
         # For "perturbed" (which has three roots we'd need to solve for), classify

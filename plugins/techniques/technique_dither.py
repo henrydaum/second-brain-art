@@ -23,6 +23,7 @@ class DitherTechnique(BaseTechnique):
         L = int(self.levels)
         mode = str(self.mode)
         arr = canvas.image_array(mode="RGB", dtype="float")
+        H, W = arr.shape[:2]
         lum = (0.2126 * arr[..., 0] + 0.7152 * arr[..., 1] + 0.0722 * arr[..., 2]).astype(np.float32)
 
         lut = np.array(
@@ -37,7 +38,7 @@ class DitherTechnique(BaseTechnique):
                 m = bayer(n // 2)
                 return np.block([[4 * m, 4 * m + 2], [4 * m + 3, 4 * m + 1]])
             b = bayer(8) / 64.0
-            tile = np.tile(b, (s // 8 + 1, s // 8 + 1))[:s, :s]
+            tile = np.tile(b, (H // 8 + 1, W // 8 + 1))[:H, :W]
             v = lum + (tile - 0.5) / L
             q = np.clip(np.round(v * (L - 1)) / (L - 1), 0.0, 1.0)
         else:
@@ -69,7 +70,7 @@ class DitherTechnique(BaseTechnique):
                             if x + 1 < D: small[y + 1, x + 1] += e
                         if y + 2 < D: small[y + 2, x] += e
             q = np.asarray(
-                Image.fromarray(np.clip(q_small * 255, 0, 255).astype(np.uint8)).resize((s, s), Image.NEAREST),
+                Image.fromarray(np.clip(q_small * 255, 0, 255).astype(np.uint8)).resize((W, H), Image.NEAREST),
                 dtype=np.float32,
             ) / 255.0
 

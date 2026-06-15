@@ -32,7 +32,7 @@ UNDO_LIMIT = 50
 # Undo/redo themselves are excluded so they only shuffle between the stacks.
 UNDOABLE_ACTIONS = frozenset({
 	"add_layer", "remove_layer", "move_layer",
-	"set_control", "set_palette", "set_size",
+	"set_control", "set_palette", "set_size", "set_aspect",
 	"clear", "regenerate",
 })
 

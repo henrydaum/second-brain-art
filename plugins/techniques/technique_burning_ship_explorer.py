@@ -43,7 +43,7 @@ class BurningShipExplorerTechnique(BaseTechnique):
 
     def run(self, canvas):
         cx, cy, zoom_exp, detail = _SPOTS.get(str(self.spot), _SPOTS["main_ship"])
-        s = canvas.size
+        W, H = int(canvas.width), int(canvas.height)
         zoom = float(2.0 ** zoom_exp) * float(self.zoom_extra)
         iter_override = int(self.iterations)
         n_iter = iter_override if iter_override >= 50 else int(detail)
@@ -55,15 +55,21 @@ class BurningShipExplorerTechnique(BaseTechnique):
 
         view = 3.0 / zoom
         half = view * 0.5
+        # Render natively at the canvas aspect: long edge spans the full
+        # half-view, short edge proportionally less, so pixels stay square and
+        # the ship is framed on center instead of cropped from a square.
+        long_edge = max(W, H)
+        half_x = half * W / long_edge
+        half_y = half * H / long_edge
         # Pan offsets the view center; ±1 on the slider moves by a full half-view.
         cx_eff = cx + float(self.pan_x) * half
         cy_eff = cy + float(self.pan_y) * half
-        re = np.linspace(cx_eff - half, cx_eff + half, s, dtype=real)
+        re = np.linspace(cx_eff - half_x, cx_eff + half_x, W, dtype=real)
         # im linspace is reversed so the ship silhouette reads right-side up.
-        im = np.linspace(cy_eff + half, cy_eff - half, s, dtype=real)
-        R, I = np.meshgrid(re, im)
+        im = np.linspace(cy_eff + half_y, cy_eff - half_y, H, dtype=real)
+        R, I = np.meshgrid(re, im)  # both (H, W)
 
-        N = s * s
+        N = W * H
         out_flat = np.zeros(N, dtype=np.float64)
         inside_flat = np.zeros(N, dtype=bool)
 
@@ -121,9 +127,9 @@ class BurningShipExplorerTechnique(BaseTechnique):
             dtype=np.uint8,
         )
         idx_lut = np.clip((t * (LUT_SIZE - 1)).astype(np.int32), 0, LUT_SIZE - 1)
-        rgb = lut[idx_lut].reshape(s, s, 3)
+        rgb = lut[idx_lut].reshape(H, W, 3)
 
         bg = np.array(art_kit.hex_to_rgb(canvas.palette.background), dtype=np.uint8)
-        rgb[inside_flat.reshape(s, s)] = bg
+        rgb[inside_flat.reshape(H, W)] = bg
 
         canvas.commit(Image.fromarray(rgb, "RGB").convert("RGBA"))

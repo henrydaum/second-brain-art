@@ -13,10 +13,13 @@ class CropTechnique(BaseTechnique):
     center = Pan(x="cx", y="cy")
 
     def run(self, canvas):
-        s = canvas.size
-        side = max(1, int(round(s / max(float(self.zoom), 1.0))))
-        half = side / 2
-        x = min(max(self.cx * s, half), s - half)
-        y = min(max(self.cy * s, half), s - half)
-        box = (int(round(x - half)), int(round(y - half)), int(round(x + half)), int(round(y + half)))
-        canvas.commit(canvas.image.crop(box).resize((s, s), Image.Resampling.LANCZOS))
+        W, H = canvas.width, canvas.height
+        zoom = max(float(self.zoom), 1.0)
+        # Crop a window with the canvas aspect ratio, then resize back to fill.
+        cw = max(1, int(round(W / zoom)))
+        ch = max(1, int(round(H / zoom)))
+        hw, hh = cw / 2, ch / 2
+        x = min(max(self.cx * W, hw), W - hw)
+        y = min(max(self.cy * H, hh), H - hh)
+        box = (int(round(x - hw)), int(round(y - hh)), int(round(x + hw)), int(round(y + hh)))
+        canvas.commit(canvas.image.crop(box).resize((W, H), Image.Resampling.LANCZOS))

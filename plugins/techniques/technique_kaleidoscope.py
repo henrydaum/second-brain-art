@@ -21,16 +21,17 @@ class KaleidoscopeTechnique(BaseTechnique):
         n = int(self.segments)
         rot = math.radians(float(self.rotation))
         arr = canvas.image_array(mode="RGB", dtype="float")
-        s = canvas.size
-        xx, yy, _, _ = art_kit.centered_grid(s)
-        cx = (s - 1) / 2.0
+        W, H = canvas.width, canvas.height
+        xx, yy, _, _ = art_kit.centered_grid(W, H)
+        cx = (W - 1) / 2.0
+        cy = (H - 1) / 2.0
         dx = xx - cx
-        dy = yy - cx
+        dy = yy - cy
         r = np.sqrt(dx * dx + dy * dy)
         theta = np.arctan2(dy, dx) - rot
         wedge = 2.0 * math.pi / n
         t = np.mod(theta, 2.0 * wedge)
         t = np.where(t > wedge, 2.0 * wedge - t, t)
         sx = cx + np.cos(t + rot) * r
-        sy = cx + np.sin(t + rot) * r
+        sy = cy + np.sin(t + rot) * r
         canvas.commit_array(art_kit.bilinear_sample(arr, sx, sy))

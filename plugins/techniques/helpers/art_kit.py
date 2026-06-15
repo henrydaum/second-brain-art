@@ -534,23 +534,30 @@ def radial_falloff(w, h, cx=None, cy=None):
 # these (background techniques, PIL-only transforms) pay no import cost.
 # ---------------------------------------------------------------------------
 
-def centered_grid(size):
-    """Return (xx, yy, nx, ny) for an ``size x size`` canvas.
+def centered_grid(width, height=None):
+    """Return (xx, yy, nx, ny) for a ``width x height`` canvas.
 
-    xx, yy: float32 pixel coordinates (0..size-1).
-    nx, ny: normalized to [-1, +1] from the canvas center — what every radial
-            distortion (fisheye, CA, vignette) actually wants.
+    Pass one argument for a square (``centered_grid(size)``) or both for a
+    non-square canvas (``centered_grid(canvas.width, canvas.height)``).
+
+    xx, yy: float32 pixel coordinates (0..width-1, 0..height-1).
+    nx, ny: normalized from the canvas center — what every radial distortion
+            (fisheye, CA, vignette) actually wants. Both axes share the same
+            scale (the larger half-extent), so circles stay circular on a
+            non-square canvas instead of stretching into ellipses.
 
     Techniques that want a custom center can compute their own normalization off
     of xx/yy; this helper covers the 95% case.
     """
     import numpy as _np
-    s = int(size)
-    yy, xx = _np.mgrid[0:s, 0:s].astype(_np.float32)
-    c = (s - 1) / 2.0
-    half = max(c, 1.0)
-    nx = (xx - c) / half
-    ny = (yy - c) / half
+    w = int(width)
+    h = int(height) if height is not None else w
+    yy, xx = _np.mgrid[0:h, 0:w].astype(_np.float32)
+    cx = (w - 1) / 2.0
+    cy = (h - 1) / 2.0
+    half = max(cx, cy, 1.0)
+    nx = (xx - cx) / half
+    ny = (yy - cy) / half
     return xx, yy, nx, ny
 
 

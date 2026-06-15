@@ -37,7 +37,7 @@ class JuliaExplorerTechnique(BaseTechnique):
 
     def run(self, canvas):
         jx, jy, zoom_exp, detail = _SPOTS.get(str(self.spot), _SPOTS["dragon"])
-        s = int(canvas.size)
+        W, H = int(canvas.width), int(canvas.height)
         zoom = float(2.0 ** zoom_exp) * float(self.zoom_extra)
         iter_override = int(self.iterations)
         n_iter = iter_override if iter_override >= 50 else int(detail)
@@ -54,18 +54,24 @@ class JuliaExplorerTechnique(BaseTechnique):
         # 4-unit window centered at origin frames every filled Julia with |c| <= 2.
         view = 4.0 / zoom
         half = view * 0.5
+        # Render natively at the canvas aspect: long edge spans the full
+        # half-view, short edge proportionally less, so pixels stay square and
+        # the set is framed on center instead of cropped from a square.
+        long_edge = max(W, H)
+        half_x = half * W / long_edge
+        half_y = half * H / long_edge
         # Pan offsets the view center; ±1 on the slider moves by a full half-view.
         offset_x = float(self.pan_x) * half
         offset_y = float(self.pan_y) * half
-        re = np.linspace(-half + offset_x, half + offset_x, s, dtype=real)
-        im = np.linspace(-half + offset_y, half + offset_y, s, dtype=real)
-        R, I = np.meshgrid(re, im)
+        re = np.linspace(-half_x + offset_x, half_x + offset_x, W, dtype=real)
+        im = np.linspace(-half_y + offset_y, half_y + offset_y, H, dtype=real)
+        R, I = np.meshgrid(re, im)  # both (H, W)
 
         er2 = max(abs(c_scalar), 2.0) ** 2
         initial_abs2 = (R * R + I * I).ravel()
         escapes_now = initial_abs2 > er2
 
-        N = s * s
+        N = W * H
         out_flat = np.zeros(N, dtype=np.float64)
         inv_log2 = 1.0 / np.log(2.0)
         if escapes_now.any():
@@ -119,9 +125,9 @@ class JuliaExplorerTechnique(BaseTechnique):
             dtype=np.uint8,
         )
         idx_lut = np.clip((t * (LUT_SIZE - 1)).astype(np.int32), 0, LUT_SIZE - 1)
-        rgb = lut[idx_lut].reshape(s, s, 3)
+        rgb = lut[idx_lut].reshape(H, W, 3)
 
         bg = np.array(art_kit.hex_to_rgb(canvas.palette.background), dtype=np.uint8)
-        rgb[inside_flat.reshape(s, s)] = bg
+        rgb[inside_flat.reshape(H, W)] = bg
 
         canvas.commit(Image.fromarray(rgb, "RGB").convert("RGBA"))

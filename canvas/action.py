@@ -206,7 +206,7 @@ class CanvasSetPalette(CanvasAction):
 
 
 class CanvasSetSize(CanvasAction):
-	"""Update the canvas size (clamped to MIN/MAX by Canvas.set_size)."""
+	"""Update the canvas to a square (clamped to MIN/MAX by Canvas.set_size)."""
 
 	action_type = "set_size"
 
@@ -217,6 +217,37 @@ class CanvasSetSize(CanvasAction):
 			raise self.error(ERROR_INVALID_INPUT, "set_size requires integer 'size'.")
 		self.cs.canvas.set_size(size)
 		ev = self.cs.event("set_size", size=self.cs.canvas.size)
+		return ActionResult(True, self.action_type, events=[ev])
+
+
+class CanvasSetAspect(CanvasAction):
+	"""Set the canvas aspect ratio from a ``ratio_w:ratio_h`` preset.
+
+	Resolution is long-edge anchored: the longer dimension keeps the current
+	long edge (``canvas.size``); the shorter is scaled down by the ratio.
+	Orientation is simply which of ratio_w/ratio_h is larger.
+	"""
+
+	action_type = "set_aspect"
+
+	def execute(self) -> ActionResult:
+		"""Compute width/height from the ratio and apply."""
+		rw = self.content.get("ratio_w")
+		rh = self.content.get("ratio_h")
+		try:
+			rw = float(rw)
+			rh = float(rh)
+		except (TypeError, ValueError):
+			raise self.error(ERROR_INVALID_INPUT, "set_aspect requires numeric 'ratio_w' and 'ratio_h'.")
+		if not (rw > 0 and rh > 0):
+			raise self.error(ERROR_INVALID_INPUT, "set_aspect ratios must be positive.")
+		base = int(self.cs.canvas.size)  # current long edge
+		if rw >= rh:
+			width, height = base, round(base * rh / rw)
+		else:
+			width, height = round(base * rw / rh), base
+		self.cs.canvas.set_dimensions(int(width), int(height))
+		ev = self.cs.event("set_aspect", width=self.cs.canvas.width, height=self.cs.canvas.height)
 		return ActionResult(True, self.action_type, events=[ev])
 
 

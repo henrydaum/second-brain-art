@@ -20,10 +20,10 @@ class DotScreenTechnique(BaseTechnique):
     def run(self, canvas):
         c = int(self.cell_size)
         amt = float(self.strength)
-        s = canvas.size
         arr = canvas.image_array(mode="RGB", dtype="float")
+        H, W = arr.shape[:2]
         lum = arr[..., 0] * 0.2126 + arr[..., 1] * 0.7152 + arr[..., 2] * 0.0722
-        yy, xx = np.mgrid[0:s, 0:s].astype(np.float32)
+        yy, xx = np.mgrid[0:H, 0:W].astype(np.float32)
         gx = xx % c - (c / 2.0)
         gy = yy % c - (c / 2.0)
         d = np.sqrt(gx * gx + gy * gy)

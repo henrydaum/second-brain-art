@@ -21,18 +21,31 @@ MAX_CHAIN_LENGTH = 6
 
 @dataclass
 class Canvas:
-	"""One canvas: palette, size, ordered layer chain."""
+	"""One canvas: palette, dimensions (width × height), ordered layer chain.
 
-	size: int = DEFAULT_SIZE
+	Resolution is **long-edge anchored**: an aspect ratio is realized by
+	keeping the longer dimension at the base size and shrinking the shorter
+	one. A square is simply ``width == height``.
+	"""
+
+	width: int = DEFAULT_SIZE
+	height: int = DEFAULT_SIZE
 	palette_id: str = DEFAULT_PALETTE_ID
 	layers: list[dict] = field(default_factory=list)
+
+	@property
+	def size(self) -> int:
+		"""Legacy scalar: the long edge. Kept for callers that predate
+		non-square canvases; new code should read ``width``/``height``."""
+		return max(int(self.width), int(self.height))
 
 	# ── serialization ────────────────────────────────────────────────
 
 	def to_dict(self) -> dict[str, Any]:
 		"""Serialize to a JSON-safe dict."""
 		return {
-			"size": self.size,
+			"width": self.width,
+			"height": self.height,
 			"palette_id": self.palette_id,
 			"layers": list(self.layers),
 		}
@@ -42,8 +55,11 @@ class Canvas:
 		"""Restore from a dict produced by ``to_dict``."""
 		if not data:
 			return cls()
+		# Tolerate a legacy square ``size`` key (→ width == height == size).
+		legacy = int(data.get("size") or DEFAULT_SIZE)
 		return cls(
-			size=int(data.get("size") or DEFAULT_SIZE),
+			width=int(data.get("width") or legacy),
+			height=int(data.get("height") or legacy),
 			palette_id=str(data.get("palette_id") or DEFAULT_PALETTE_ID),
 			# Tolerate the old ``last_chain`` key during the rename window.
 			layers=list(data.get("layers") or data.get("last_chain") or []),
@@ -105,9 +121,15 @@ class Canvas:
 			raise ValueError(f"unknown chain entry kind: {kind!r}")
 
 	def set_size(self, size: int) -> None:
-		"""Set canvas size, clamped to MIN_SIZE..MAX_SIZE."""
-		self.size = max(MIN_SIZE, min(MAX_SIZE, int(size)))
+		"""Set a square canvas, each edge clamped to MIN_SIZE..MAX_SIZE."""
+		edge = max(MIN_SIZE, min(MAX_SIZE, int(size)))
+		self.width = self.height = edge
+
+	def set_dimensions(self, width: int, height: int) -> None:
+		"""Set canvas width and height independently, each clamped to MIN/MAX."""
+		self.width = max(MIN_SIZE, min(MAX_SIZE, int(width)))
+		self.height = max(MIN_SIZE, min(MAX_SIZE, int(height)))
 
 	def reset(self) -> None:
-		"""Clear the chain. Palette and size preserved."""
+		"""Clear the chain. Palette and dimensions preserved."""
 		self.layers = []

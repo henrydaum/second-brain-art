@@ -19,8 +19,9 @@ class PencilSketchTechnique(BaseTechnique):
     paper = Enum([("white", "White"), ("cream", "Cream"), ("gray", "Soft Gray")], default="cream")
 
     def run(self, canvas):
-        s = canvas.size
+        s = canvas.size  # long edge — blur-radius scale only
         arr = canvas.image_array(mode="RGB", dtype="float")
+        H, W = arr.shape[:2]
         lum = arr[..., 0] * 0.2126 + arr[..., 1] * 0.7152 + arr[..., 2] * 0.0722
 
         # Color dodge: inverted + blurred / original.
@@ -50,7 +51,7 @@ class PencilSketchTechnique(BaseTechnique):
 
         # Grain.
         if float(self.grain) > 0.01:
-            yy, xx = np.mgrid[0:s, 0:s].astype(np.float32)
+            yy, xx = np.mgrid[0:H, 0:W].astype(np.float32)
             n = art_kit.value_noise_grid(canvas.seed, xx * 0.5, yy * 0.5).astype(np.float32)
             out = out + (n - 0.5) * float(self.grain) * 0.15
             out = np.clip(out, 0.0, 1.0)

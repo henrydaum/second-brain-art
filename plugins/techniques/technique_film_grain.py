@@ -18,11 +18,11 @@ class FilmGrainTechnique(BaseTechnique):
     monochrome = Bool(default=True)
 
     def run(self, canvas):
-        s = canvas.size
         rng = np.random.default_rng(canvas.seed)
         arr = canvas.image_array(mode="RGB", dtype="float")
+        H, W = arr.shape[:2]
         if self.monochrome:
-            noise = rng.standard_normal((s, s, 1)).astype(np.float32) * float(self.intensity)
+            noise = rng.standard_normal((H, W, 1)).astype(np.float32) * float(self.intensity)
         else:
-            noise = rng.standard_normal((s, s, 3)).astype(np.float32) * float(self.intensity)
+            noise = rng.standard_normal((H, W, 3)).astype(np.float32) * float(self.intensity)
         canvas.commit_array(np.clip(arr + noise, 0.0, 1.0))
