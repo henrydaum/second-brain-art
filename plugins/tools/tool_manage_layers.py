@@ -114,6 +114,26 @@ class ManageLayers(BaseTool):
 		"required": ["action"],
 	}
 
+	def agent_prompt_for(self, ctx) -> str:
+		"""List the available palettes with their colors so the agent can match user color requests to a palette id."""
+		try:
+			from plugins.helpers.palettes import list_palettes
+			palettes = list_palettes()
+		except Exception:
+			return ""
+		if not palettes:
+			return ""
+		lines = [
+			"## Available palettes",
+			"The canvas has a fixed catalog of palettes. To change the palette on a layer, the layer's technique must expose a `palette` control (use read_technique on its slug to check — look for `palette = Palette()`). Then call `manage_layers` with `action=set_control`, `chain_index=<n>`, `name=\"palette\"`, `value=\"<id>\"`. Use the `id` slug below, not the display name. Match a user's color request (e.g. \"red/orange/yellow\", \"neon\", \"earthy\") to the closest palette by its kind and hex colors.",
+			"",
+			"Format: `id (Name) — kind: primary secondary tertiary accent / bg background`",
+			"",
+		]
+		for p in palettes:
+			lines.append(f"- {p.id} ({p.name}) — {p.kind}: {p.primary} {p.secondary} {p.tertiary} {p.accent} / bg {p.background}")
+		return "\n".join(lines)
+
 	def run(self, context, **kwargs) -> ToolResult:
 		"""Dispatch on the ``action`` argument to the matching canvas action."""
 		action = str(kwargs.get("action") or "").lower()
