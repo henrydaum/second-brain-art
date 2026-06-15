@@ -5,7 +5,7 @@
 const TIPS = [
   "Second Brain writes and executes code to make images — it doesn't use a diffusion image model.",
   "You can have up to six layers in a single canvas, each with up to four settings.",
-  "Save a canvas to remix it later from this browser.",
+  "Use Download for an image file, or Share for a persistent remixable link.",
   "You can completely avoid talking to an AI by using the manual controls.",
   "Conversations are ephemeral — your messages are cleared from the database whenever you start a new chat, or after 24 hours, whichever comes first.",
   "You can use ctrl/cmd + Z to undo changes, and ctrl/cmd + shift + Z to redo them.",

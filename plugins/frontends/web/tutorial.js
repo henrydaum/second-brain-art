@@ -26,8 +26,8 @@
       note: "Useful if you prefer manual controls instead of chatting."
     },
     {
-      title: "Save, download, or share.",
-      body: "Use the buttons above the canvas to keep the image, export a PNG, or send it to a friend.",
+      title: "Download or share.",
+      body: "Use the buttons above the canvas to export a PNG or send a persistent link to a friend.",
       note: "Anything you share can be opened and remixed by anyone who sees it — they get the layers and settings, but your personal canvas remains unaffected."
     },
     {
@@ -37,8 +37,8 @@
     },
     {
       title: "Keep links you care about.",
-      body: "Saved canvases are tied to this browser, while share links are persistent URLs.",
-      note: "If you want a durable reference outside this browser, keep the share link."
+      body: "Share links are persistent URLs.",
+      note: "If you want a durable reference, keep the share link."
     }
   ];
 

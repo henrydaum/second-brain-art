@@ -21,7 +21,7 @@ const renderMeterFill = document.querySelector("#renderMeterFill");
 const renderMeterLabel = document.querySelector("#renderMeterLabel");
 const downloadImage = document.querySelector("#downloadImage");
 const downloadPanel = document.querySelector("#downloadPanel");
-const saveBtn = document.querySelector("#saveImage");
+const headerCanvasActions = document.querySelector("#headerCanvasActions");
 const shareBtn = document.querySelector("#shareImage");
 const sharePanel = document.querySelector("#sharePanel");
 const shareLinkInput = document.querySelector("#shareLink");
@@ -35,8 +35,6 @@ const linkModalUrl = document.querySelector("#linkModalUrl");
 const linkModalQr = document.querySelector("#linkModalQr");
 const linkModalCopy = document.querySelector("#linkModalCopy");
 const linkModalDownload = document.querySelector("#linkModalDownload");
-const archive = document.querySelector("#archive");
-const archivePaginator = document.querySelector("#archivePaginator");
 const settingsBtn = document.querySelector("#settingsBtn");
 const settingsModal = document.querySelector("#settingsModal");
 const settingsStatus = document.querySelector("#settingsStatus");
@@ -48,10 +46,8 @@ const controlsToggle = document.querySelector("#controlsToggle");
 const techniqueSearchResults = document.querySelector("#techniqueSearchResults");
 const emptyState = document.querySelector("#emptyState");
 const NEAR_BOTTOM_PX = 80;
-const GALLERY_PAGE = 10;
 let palettesCache = [];
 let currentControlsPanels = [];
-let archivePage = 1;
 const pendingControls = new Map();
 let typingEl = null;
 const TOOL_LABELS = {
@@ -277,10 +273,8 @@ function render(events) {
       setCanvas(ev.canvas || {url: ev.url, name: ev.name});
     }
     else if (ev.type === "canvas_reset") { clearPendingControls(false); setCanvas(null); }
-    else if (ev.type === "saved") { loadArchive(1); }
     else if (ev.type === "share_link") {
       setShareLink(ev.url, ev.qr_url);
-      if (sharePanel.hidden && ev.kind === "archive") openLinkModal(ev.url, ev.qr_url, ev.share_id);
     }
     else if (ev.type === "attachment") add("assistant", `Attachment: ${ev.name}`);
     else if (ev.type === "typing") setTyping(!!ev.on);
@@ -361,11 +355,13 @@ let currentCanvasHasImage = false;
 function setCanvas(c) {
   currentCanvasSize = Number(c?.size) || 0;
   currentCanvasHasImage = !!c?.url;
+  if (headerCanvasActions) headerCanvasActions.hidden = !currentCanvasHasImage;
   if (!c?.url) {
     showcase.classList.remove("has-image");
     renderControlsPanel([]);
     heroImage.removeAttribute("src");
     setDownloadPanelOpen(false);
+    setSharePanelOpen(false);
     resetAccents();
     return;
   }
@@ -465,49 +461,6 @@ function hexWithAlpha(hex, a) {
 }
 
 async function loadCanvas() { const r = await get("/api/canvas"); setCanvas(r.canvas); }
-
-// ----- Saved canvases -----
-async function loadArchive(page = 1) {
-  archivePage = Math.max(1, page);
-  const offset = (archivePage - 1) * GALLERY_PAGE;
-  const r = await get(`/api/archive?limit=${GALLERY_PAGE}&offset=${offset}`);
-  const items = Array.isArray(r.items) ? r.items : (Array.isArray(r) ? r : []);
-  const total = typeof r.total === "number" ? r.total : items.length + offset;
-  const shareIcon = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="12" r="2.4"/><circle cx="18" cy="6" r="2.4"/><circle cx="18" cy="18" r="2.4"/><line x1="8.1" y1="11" x2="15.9" y2="7.1"/><line x1="8.1" y1="13" x2="15.9" y2="16.9"/></svg>`;
-  archive.innerHTML = items.map(x => {
-    const thumb = x.url + (x.url.includes("?") ? "&" : "?") + "w=512";
-    const ph = esc(x.pool_hash || x.path);
-    const deleteBtn = `<button class="gc-delete-btn" data-pool-hash="${ph}" data-action="delete" title="Remove from saved canvases" aria-label="Delete"></button>`;
-    return `<article class="gallery-card">${deleteBtn}<img src="${thumb}" alt="" loading="lazy" decoding="async"><div><strong>${esc(x.title)}</strong><small>${esc(x.artist)}${x.score ? ` · ${(x.score*100).toFixed(0)}% similar` : ""}</small><div class="gallery-card-actions"><button data-path="${ph}" data-action="remix">Remix</button><button class="gc-share-btn" data-path="${ph}" data-action="link" title="Get share link" aria-label="Get share link">${shareIcon}</button></div></div></article>`;
-  }).join("") || `<article class='assistant'>Your saved canvases will appear here.</article>`;
-  renderArchivePaginator(total);
-}
-
-function renderArchivePaginator(total) {
-  const el = archivePaginator;
-  const pages = Math.max(1, Math.ceil(total / GALLERY_PAGE));
-  if (pages <= 1) { el.hidden = true; el.innerHTML = ""; return; }
-  el.hidden = false;
-  const cur = archivePage;
-  const btns = [];
-  btns.push(`<button type="button" data-page="${cur-1}" ${cur===1?"disabled":""}>‹</button>`);
-  const set = new Set([1, pages, cur-1, cur, cur+1]);
-  for (let p = 1; p <= pages; p++) {
-    if (set.has(p)) btns.push(`<button type="button" data-page="${p}" class="${p===cur?"active":""}">${p}</button>`);
-    else if (p === 2 || p === pages-1) btns.push(`<button type="button" disabled>…</button>`);
-  }
-  btns.push(`<button type="button" data-page="${cur+1}" ${cur===pages?"disabled":""}>›</button>`);
-  el.innerHTML = btns.join("");
-}
-
-archivePaginator.addEventListener("click", e => {
-  const b = e.target.closest("button[data-page]");
-  if (!b || b.disabled) return;
-  const p = +b.dataset.page;
-  if (!Number.isFinite(p)) return;
-  loadArchive(p);
-  document.querySelector(".gallery-section").scrollIntoView({behavior: "smooth", block: "start"});
-});
 
 async function loadPalettes() {
   const r = await get("/api/palettes");
@@ -942,7 +895,6 @@ document.querySelector("#newChat").addEventListener("click", async () => {
     window.SBTutorial.build(emptyState, { onTryIt: tutorialTryIt, onSearchDemo: tutorialSearchDemo });
   }
   render((await post("/api/new")).events);
-  loadArchive(1);
 });
 
 // Tutorial carousel: live hero (replaces the old empty-state copy) + Help modal.
@@ -1064,17 +1016,6 @@ document.addEventListener("pointerdown", e => {
 document.addEventListener("keydown", e => {
   if (e.key === "Escape" && !downloadPanel.hidden) setDownloadPanelOpen(false);
 });
-saveBtn.addEventListener("click", async () => {
-  if (saveBtn.disabled) return;
-  saveBtn.disabled = true;
-  saveBtn.classList.add("loading");
-  try {
-    const r = await post("/api/save");
-    render(r.events);
-    loadArchive(1);
-  } catch (err) { add("error", err.message); }
-  finally { saveBtn.disabled = false; saveBtn.classList.remove("loading"); }
-});
 function setShareLink(url, qrUrl) {
   if (shareLinkInput) shareLinkInput.value = url || "";
   if (qrUrl) {
@@ -1129,39 +1070,6 @@ function openLinkModal(url, qrUrl, shareId) {
 linkModalCopy?.addEventListener("click", () => copyToClipboard(linkModalUrl.value, linkModalCopy));
 document.querySelectorAll('[data-close="linkModal"]').forEach(b => b.addEventListener("click", () => linkModal.hidden = true));
 
-async function handleGalleryAction(e) {
-  const delBtn = e.target.closest("button.gc-delete-btn");
-  if (delBtn) {
-    const poolHash = delBtn.dataset.poolHash || "";
-    if (!poolHash || !confirm("Remove this canvas from saved canvases?")) return;
-    delBtn.disabled = true;
-    try {
-      const r = await post("/api/archive/delete", {pool_hash: poolHash});
-      if (r && r.ok) loadArchive(archivePage);
-      else add("error", (r && r.error) || "Could not remove.");
-    } catch (err) { add("error", err.message); }
-    finally { delBtn.disabled = false; }
-    return;
-  }
-  const btn = e.target.closest("button[data-path]");
-  if (!btn) return;
-  const action = btn.dataset.action || "remix";
-  if (action === "link") {
-    try {
-      const r = await post("/api/get_link", {kind: "archive", path: btn.dataset.path});
-      if (r && r.ok) openLinkModal(r.url, r.qr_url, r.share_id);
-      else add("error", (r && r.error) || "Could not generate link.");
-    } catch (err) { add("error", err.message); }
-    return;
-  }
-  scrollTo({top:0, behavior:"smooth"});
-  loaderTicketStart();
-  try { render((await post("/api/archive_remix", {path: btn.dataset.path})).events); }
-  catch (err) { add("error", err.message); }
-  finally { loaderTicketEnd(); }
-}
-archive.addEventListener("click", handleGalleryAction);
-
 async function handleShareDeepLink() {
   const params = new URLSearchParams(location.search);
   const shareId = params.get("share");
@@ -1209,4 +1117,4 @@ document.addEventListener("keydown", async (e) => {
 });
 connectEvents();
 const bootingShare = new URLSearchParams(location.search).has("share");
-loadHistory(); loadPalettes(); if (bootingShare) handleShareDeepLink(); else loadCanvas(); loadArchive(1); refreshSettings();
+loadHistory(); loadPalettes(); if (bootingShare) handleShareDeepLink(); else loadCanvas(); refreshSettings();

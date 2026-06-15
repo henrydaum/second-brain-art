@@ -51,33 +51,6 @@ def test_web_settings_persist_per_browser_guest_and_apply_scope(tmp_path):
     frontend.unbind()
 
 
-def test_saved_canvas_uses_kernel_guest_user_and_archive_is_browser_local(tmp_path):
-    db, runtime, frontend = _frontend(tmp_path)
-    key = frontend.session_key("browser-a")
-    image = tmp_path / "saved.png"
-    image.write_bytes(b"png")
-
-    class _CanvasRuntime:
-        def for_session(self, _key):
-            class _State:
-                canvas = type("CanvasObj", (), {"layers": [{"technique_slug": "demo"}]})()
-            return _State()
-
-    frontend._canvas_runtime = lambda: _CanvasRuntime()
-    frontend._new_canvas_snap = lambda _key, **_kw: {"path": str(image), "pool_hash": "abc123"}
-    assert frontend.save_canvas("browser-a")[0]["type"] == "saved"
-
-    uid = runtime.session_user_id(key)
-    row = db.conn.execute(
-        "SELECT user_id, action FROM user_canvas_actions WHERE pool_hash = 'abc123'"
-    ).fetchone()
-    assert row["user_id"] == str(uid)
-    assert row["action"] == "save"
-    assert frontend.archive_listing("browser-a")["total"] == 1
-    assert frontend.archive_listing("browser-b")["total"] == 0
-    frontend.unbind()
-
-
 def test_account_page_redirects_to_root_and_file_is_gone(tmp_path):
     _db, _runtime, frontend = _frontend(tmp_path)
     server = _Server(("127.0.0.1", 0), _Handler, frontend, max_global=8, max_per_ip=8)
