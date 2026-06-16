@@ -166,6 +166,31 @@ article.credit-error { display: grid; gap: 7px; color: var(--muted); background:
 .download-panel .dp-size-btn .dp-size-label { font-weight: 700; letter-spacing: .01em; }
 .download-panel .dp-size-btn .dp-size-dims { font-size: 11px; color: var(--muted); font-family: ui-monospace, "Cascadia Code", "Consolas", monospace; }
 .download-panel .dp-size-btn:hover:not(:disabled) .dp-size-dims { color: var(--accent); }
+
+/* ----- Video panel ----- */
+.video-panel { padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; flex: 1; }
+.video-panel[hidden] { display: none; }
+.video-panel .vp-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.video-panel .vp-head strong { font-size: 13px; letter-spacing: .02em; }
+.video-panel .vp-close { width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--line); background: #11151d; color: var(--muted); cursor: pointer; font-size: 13px; }
+.video-panel .vp-close:hover { border-color: var(--accent); color: var(--accent); }
+.video-panel .vp-hint { margin: 0; font-size: 11px; line-height: 1.45; color: var(--muted); }
+.video-panel .vp-field { display: flex; flex-direction: column; gap: 4px; font-size: 11px; color: var(--muted); }
+.video-panel .vp-field > span { text-transform: uppercase; letter-spacing: .06em; font-size: 10px; }
+.video-panel .vp-field select,
+.video-panel .vp-field input { height: 32px; padding: 0 8px; border: 1px solid var(--line); background: #10141e; color: var(--text); font-size: 12px; }
+.video-panel .vp-field select:focus,
+.video-panel .vp-field input:focus { outline: none; border-color: var(--accent); }
+.video-panel .vp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.video-panel .vp-frames { margin: 0; font-size: 11px; color: var(--text); font-family: ui-monospace, "Cascadia Code", "Consolas", monospace; }
+.video-panel .vp-lead { margin: 4px 0 0; font-size: 10.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+.video-panel .vp-tiers { display: grid; gap: 8px; }
+.video-panel .vp-size-btn { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; height: 36px; padding: 0 12px; border: 1px solid var(--line); background: #10141e; color: var(--text); cursor: pointer; transition: border-color 160ms ease, color 160ms ease; }
+.video-panel .vp-size-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.video-panel .vp-size-btn:disabled { opacity: .7; cursor: progress; }
+.video-panel .vp-size-btn .vp-size-label { font-weight: 700; letter-spacing: .01em; }
+.video-panel .vp-size-btn .vp-size-dims { font-size: 11px; color: var(--muted); font-family: ui-monospace, "Cascadia Code", "Consolas", monospace; }
+.video-panel .vp-size-btn:hover:not(:disabled) .vp-size-dims { color: var(--accent); }
 #linkModal .modal-card.link-modal-card { max-width: 320px; display: grid; gap: 14px; place-items: center; text-align: center; }
 #linkModal .link-modal-card .sp-link { width: 100%; display: flex; gap: 6px; }
 #linkModal .link-modal-card input { flex: 1 1 auto; min-width: 0; height: 34px; padding: 0 10px; background: #10141e; border: 1px solid var(--line); color: var(--text); font-family: ui-monospace, monospace; font-size: 11.5px; }
@@ -204,6 +229,7 @@ body.share-landing.missing .share-landing-meta { text-align: center; }
 .controls-drawer:not(.open) { display: none; }
 .controls-drawer[hidden] { display: none; }
 .controls-panel { padding: 14px 16px; display: flex; flex-direction: column; gap: 14px; flex: 1; }
+.controls-panel[hidden] { display: none; }
 .controls-panel.loading { cursor: wait; opacity: .85; pointer-events: none; }
 
 .ctl-panel { --kind-c: var(--line); --kind-text: var(--muted); --depth: 0; position: relative; display: grid; gap: 8px; padding: 12px 14px 14px; border-left: 3px solid var(--kind-c); background: linear-gradient(90deg, color-mix(in srgb, var(--kind-c) calc(7% + var(--depth) * 11%), transparent), transparent 72%); transition: opacity 160ms ease; }

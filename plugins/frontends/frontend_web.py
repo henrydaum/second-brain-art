@@ -15,6 +15,7 @@ import socket
 import time
 import threading
 import uuid
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from collections import defaultdict, OrderedDict
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -109,6 +110,8 @@ class WebFrontend(BaseFrontend):
         ("Web Max Global Connections", "web_max_global_connections", "Maximum simultaneous in-flight HTTP requests across all clients.", DEFAULT_MAX_GLOBAL_CONNECTIONS, {"type": "integer"}),
         ("Web Max Per-IP Connections", "web_max_ip_connections", "Maximum simultaneous in-flight HTTP requests from a single IP.", DEFAULT_MAX_IP_CONNECTIONS, {"type": "integer"}),
         ("App Base URL", "app_base_url", "Public origin of the web demo, used to build share links.", "http://127.0.0.1:8765", {"type": "text"}),
+        ("Video Frame Timeout", "video_frame_timeout_s", "Per-frame render timeout (seconds) when exporting a video.", 60, {"type": "integer"}),
+        ("Video Render Workers", "video_render_workers", "Maximum video frames to render at once.", 2, {"type": "integer"}),
         # The two per-user "advanced settings", stored in users.config.
         ("Technique Authoring", "technique_authoring_enabled", "Allow this user's assistant to create/edit/delete custom techniques.", False, {"type": "bool", "scope": "user"}),
         ("Community Techniques", "community_techniques_enabled", "Show community-authored (non-built-in) techniques in search and the picker.", False, {"type": "bool", "scope": "user"}),
@@ -758,6 +761,250 @@ class WebFrontend(BaseFrontend):
             "pool_hash": rr.pool_hash,
         }]
 
+    # ── video export ─────────────────────────────────────────────────────
+    # Sweep one (or several — the API is a list) slider(s) across a range,
+    # rendering one frame per step with the SAME seed reused every frame, then
+    # stitch the frames into an animated file. Reusing the seed is the whole
+    # trick: only the iterated slider moves the pixels, so every unchanged
+    # prefix layer is a free cache hit (canvas/render.py prefix cache).
+
+    MAX_VIDEO_FRAMES = 300
+    MAX_VIDEO_FPS = 30
+    MAX_VIDEO_SECONDS = 10
+
+    def render_video(self, session_id: str, specs: list[dict] | None = None, controls: list[dict] | None = None,
+                     fps=None, seconds=None, fmt: str = "gif", scale=1.0) -> list[dict]:
+        """Render a slider sweep into an animated file and return a download URL.
+
+        ``specs`` is a list of ``{chain_index, name, start, end}`` — V1 UI sends
+        one, but the backend already handles N (architecture stays open to
+        multi-slider sweeps). Frame ``i`` value = ``start + delta*i`` where
+        ``delta = (end - start) / (frame_count - 1)``; reversing (end < start) is
+        allowed. Sweep is constant/linear for now.
+        """
+        from plugins.frontends.helpers.video_encode import encode_frames
+
+        key = self.session_key(session_id)
+        cr = self._canvas_runtime()
+        technique_registry = getattr(self.runtime, "technique_registry", None)
+        if cr is None or technique_registry is None:
+            return [{"type": "error", "content": "Video failed: canvas runtime not available"}]
+        cs = cr.for_session(key)
+        if not cs.canvas.layers:
+            return [{"type": "error", "content": "Nothing to animate — canvas is empty."}]
+
+        fmt = "gif"
+        ok, err, info = self._validate_video_request(cs, specs, fps, seconds, scale, fmt)
+        if not ok:
+            return [{"type": "error", "content": f"Video failed: {err}"}]
+
+        self._prune_video_exports()
+        frame_count = info["frame_count"]
+        plans = info["plans"]
+        target_w, target_h = info["width"], info["height"]
+        # Reuse the live seed for EVERY frame so randomness is fixed.
+        seed = getattr(cs, "render_seed", None)
+        worker_pool = (getattr(self.runtime, "services", None) or {}).get("technique_worker_pool")
+        frame_timeout = _int(self.config.get("video_frame_timeout_s"), 60)
+        render_workers = max(1, min(frame_count, _int(self.config.get("video_render_workers"), 2), 8))
+        render_worker_pool = worker_pool
+        if render_workers > int(getattr(worker_pool, "active_limit", render_workers) or 0):
+            render_worker_pool = None
+        base_layers = [dict(layer, controls=dict(layer.get("controls") or {})) for layer in cs.canvas.layers]
+        for item in controls or []:
+            if not isinstance(item, dict):
+                return [{"type": "error", "content": "Video failed: staged control must be an object"}]
+            try:
+                ci = int(item.get("chain_index"))
+            except (TypeError, ValueError):
+                return [{"type": "error", "content": "Video failed: staged control chain_index must be an integer"}]
+            name = str(item.get("name") or "")
+            if not (0 <= ci < len(base_layers)) or not name:
+                return [{"type": "error", "content": "Video failed: invalid staged control"}]
+            base_layers[ci]["controls"][name] = item.get("value")
+
+        def frame_layers(i: int) -> list[dict]:
+            layers = []
+            overrides: dict[int, dict] = {}
+            for p in plans:
+                val = p["start"] + p["delta"] * i
+                val = max(p["min"], min(p["max"], val))  # clamp to slider bounds
+                overrides.setdefault(p["chain_index"], {})[p["name"]] = val
+            for idx, layer in enumerate(base_layers):
+                new_layer = dict(layer)
+                new_controls = dict(layer.get("controls") or {})
+                if idx in overrides:
+                    new_controls.update(overrides[idx])
+                new_layer["controls"] = new_controls
+                layers.append(new_layer)
+            return layers
+
+        def render_one(i: int) -> tuple[int, Path]:
+            frame_canvas = Canvas(
+                width=target_w, height=target_h,
+                palette_id=cs.canvas.palette_id, layers=frame_layers(i),
+            )
+            rr = _new_render_canvas(
+                CanvasState(canvas=frame_canvas),
+                technique_loader=technique_registry.get_record,
+                seed=seed,
+                db=None,
+                timeout_s=frame_timeout,
+                worker_pool=render_worker_pool,
+            )
+            return i, Path(rr.image_path)
+
+        static_prefix_len = min(p["chain_index"] for p in plans)
+        if static_prefix_len > 0:
+            try:
+                _new_render_canvas(
+                    CanvasState(canvas=Canvas(
+                        width=target_w, height=target_h,
+                        palette_id=cs.canvas.palette_id,
+                        layers=[dict(layer, controls=dict(layer.get("controls") or {})) for layer in base_layers[:static_prefix_len]],
+                    )),
+                    technique_loader=technique_registry.get_record,
+                    seed=seed,
+                    db=None,
+                    timeout_s=frame_timeout,
+                    worker_pool=render_worker_pool,
+                )
+            except Exception as e:
+                logger.exception("render_video static prefix failed session=%s", key)
+                return [{"type": "error", "content": f"Video failed while preparing shared layers: {e}"}]
+
+        frame_paths: list[Path | None] = [None] * frame_count
+        completed = 0
+        failed_i = 0
+        try:
+            with ThreadPoolExecutor(max_workers=render_workers, thread_name_prefix="video-frame") as ex:
+                futures = {ex.submit(render_one, i): i for i in range(frame_count)}
+                for fut in as_completed(futures):
+                    failed_i = futures[fut]
+                    frame_idx, path = fut.result()
+                    frame_paths[frame_idx] = path
+                    completed += 1
+                    self.render_canvas_status(key, {
+                        "status": "video_frame", "frame": completed, "total_frames": frame_count,
+                    })
+        except Exception as e:
+            logger.exception("render_video frame failed session=%s", key)
+            return [{"type": "error", "content": f"Video failed on frame {failed_i + 1}/{frame_count}: {e}"}]
+
+        try:
+            out_path, download_name = encode_frames(
+                [p for p in frame_paths if p is not None], fps=info["fps"], fmt=info["fmt"], out_dir=_video_export_dir(),
+            )
+        except Exception as e:
+            logger.exception("video encode failed session=%s", key)
+            return [{"type": "error", "content": f"Video encode failed: {e}"}]
+
+        return [{
+            "type": "video_ready",
+            "url": _video_file_url(out_path),
+            "name": download_name,
+            "frames": frame_count,
+            "fps": info["fps"],
+            "format": info["fmt"],
+            "width": target_w,
+            "height": target_h,
+        }]
+
+    def _validate_video_request(self, cs, specs, fps, seconds, scale, fmt):
+        """Validate + resolve a video request. Returns ``(ok, err, info)`` where
+        ``info`` carries ``fps, seconds, frame_count, plans, fmt, width, height``.
+        Slider bounds come from the technique's compiled schema, never the
+        client."""
+        from plugins.frontends.helpers.video_encode import SUPPORTED_FORMATS
+
+        fmt = str(fmt or "gif").lower()
+        if fmt not in SUPPORTED_FORMATS:
+            return (False, f"unsupported format '{fmt}'", {})
+        try:
+            fps_i = int(fps)
+            secs_f = float(seconds)
+            scale_f = float(scale)
+        except (TypeError, ValueError):
+            return (False, "fps, duration and resolution must be numbers", {})
+        if not (1 <= fps_i <= self.MAX_VIDEO_FPS):
+            return (False, f"fps must be between 1 and {self.MAX_VIDEO_FPS}", {})
+        if not (0 < secs_f <= self.MAX_VIDEO_SECONDS):
+            return (False, f"duration must be between 0 and {self.MAX_VIDEO_SECONDS} seconds", {})
+        if not (scale_f > 0):
+            return (False, "invalid resolution", {})
+        frame_count = round(fps_i * secs_f)
+        if frame_count < 2:
+            return (False, "need at least 2 frames — raise fps or duration", {})
+        if frame_count > self.MAX_VIDEO_FRAMES:
+            return (False, f"too many frames ({frame_count}); cap is {self.MAX_VIDEO_FRAMES}", {})
+        if not specs:
+            return (False, "no slider selected to animate", {})
+
+        layers = cs.canvas.layers
+        technique_registry = self.runtime.technique_registry
+        plans = []
+        for spec in specs:
+            if not isinstance(spec, dict):
+                return (False, "each slider spec must be an object", {})
+            try:
+                ci = int(spec.get("chain_index"))
+            except (TypeError, ValueError):
+                return (False, "chain_index must be an integer", {})
+            if not (0 <= ci < len(layers)):
+                return (False, f"chain_index {ci} out of range", {})
+            name = str(spec.get("name") or "")
+            if not name:
+                return (False, "slider spec requires a name", {})
+            tech = technique_registry.get_record(layers[ci].get("slug") or "")
+            ctrl = next((c for c in (getattr(tech, "controls", None) or [])
+                         if c.get("name") == name and c.get("type") == "slider"), None)
+            if ctrl is None:
+                return (False, f"layer {ci} has no slider named '{name}'", {})
+            lo, hi = float(ctrl["min"]), float(ctrl["max"])
+            try:
+                start = float(spec.get("start"))
+                end = float(spec.get("end"))
+            except (TypeError, ValueError):
+                return (False, "start/end must be numbers", {})
+            start = max(lo, min(hi, start))
+            end = max(lo, min(hi, end))
+            delta = (end - start) / (frame_count - 1)
+            plans.append({"chain_index": ci, "name": name, "start": start,
+                          "end": end, "min": lo, "max": hi, "delta": delta})
+
+        # Scale + clamp dimensions (mirror render_for_download's long-edge cap).
+        DOWNLOAD_LONG_CAP = 8192
+        tw = int(round(int(cs.canvas.width) * scale_f))
+        th = int(round(int(cs.canvas.height) * scale_f))
+        long_edge = max(tw, th)
+        if long_edge > DOWNLOAD_LONG_CAP:
+            f = DOWNLOAD_LONG_CAP / long_edge
+            tw = int(round(tw * f))
+            th = int(round(th * f))
+        return (True, "", {
+            "fps": fps_i, "seconds": secs_f, "frame_count": frame_count,
+            "plans": plans, "fmt": fmt, "width": max(64, tw), "height": max(64, th),
+        })
+
+    def _prune_video_exports(self, max_age_s: int = 86400, keep_recent: int = 40) -> None:
+        """Bound the exports dir: drop files older than ``max_age_s`` and keep
+        at most ``keep_recent``. These are real (non-deduped) files, unlike the
+        content-addressed render cache, so they need explicit cleanup."""
+        try:
+            d = _video_export_dir()
+            if not d.is_dir():
+                return
+            now = time.time()
+            files = sorted(d.glob("*"), key=lambda p: p.stat().st_mtime, reverse=True)
+            for i, p in enumerate(files):
+                try:
+                    if i >= keep_recent or (now - p.stat().st_mtime) > max_age_s:
+                        p.unlink()
+                except OSError:
+                    pass
+        except Exception:
+            logger.exception("prune video exports failed")
+
     def regenerate(self, session_id: str, controls: list[dict] | None = None, force_new_seed: bool = False) -> list[dict]:
         """Apply staged controls, then re-render the current chain."""
         key = self.session_key(session_id)
@@ -1288,6 +1535,24 @@ class _Handler(BaseHTTPRequestHandler):
             except ValueError:
                 width = 0
             return self._local_file(qs.get("path", [""])[0], sid, "", width)
+        if path == "/video_files":
+            qs = parse_qs(parsed.query)
+            target = Path(unquote(qs.get("path", [""])[0]))
+            if not _is_public_video(target):
+                return self.send_error(404)
+            try:
+                data = target.read_bytes()
+            except OSError:
+                return self.send_error(404)
+            ctype = mimetypes.guess_type(str(target))[0] or "application/octet-stream"
+            self.send_response(200)
+            self.send_header("Content-Type", ctype)
+            self.send_header("Content-Length", str(len(data)))
+            self.send_header("Content-Disposition", f'attachment; filename="{target.name}"')
+            self.send_header("Cache-Control", "public, max-age=86400")
+            self.end_headers()
+            self.wfile.write(data)
+            return
         if path == "/favicon.ico":
             return self._raw_file(FAVICON_PATH, "image/x-icon")
         rel = "index.html" if path in {"", "/"} else path.lstrip("/")
@@ -1345,6 +1610,16 @@ class _Handler(BaseHTTPRequestHandler):
             if self.path == "/api/render_for_download":
                 return self._json({"ok": True, "events": self.server.frontend.render_for_download(
                     sid, float(body.get("scale") or 1.0),
+                )})
+            if self.path == "/api/render_video":
+                return self._json({"ok": True, "events": self.server.frontend.render_video(
+                    sid,
+                    specs=list(body.get("specs") or []),
+                    fps=body.get("fps"),
+                    seconds=body.get("seconds"),
+                    controls=list(body.get("controls") or []),
+                    fmt="gif",
+                    scale=float(body.get("scale") or 1.0),
                 )})
             if self.path == "/api/regenerate":
                 return self._json({"ok": True, "events": self.server.frontend.regenerate(
@@ -1621,6 +1896,35 @@ def _file_url(path: Path) -> str:
     except Exception:
         v = 0
     return f"/files?path={quote(str(path.resolve()), safe='')}&v={v}"
+
+
+def _video_export_dir() -> Path:
+    return DATA_DIR / "video_exports"
+
+
+def _video_file_url(path: Path) -> str:
+    try:
+        v = int(path.stat().st_mtime)
+    except Exception:
+        v = 0
+    return f"/video_files?path={quote(str(path.resolve()), safe='')}&v={v}"
+
+
+def _is_public_video(path: Path) -> bool:
+    """Serve only animated exports under DATA_DIR/video_exports/. The /files
+    route deliberately can't serve these (it enforces the content-addressed
+    pool-hash filename shape under canvas_renders/), so video gets its own
+    route + guard."""
+    try:
+        target = path.resolve()
+        root = _video_export_dir().resolve()
+        if not target.is_file():
+            return False
+        if root != target and root not in target.parents:
+            return False
+        return target.suffix.lower() in {".webp", ".gif", ".mp4"}
+    except Exception:
+        return False
 
 
 def _image_event(path: Path, canvas_payload: dict) -> dict:

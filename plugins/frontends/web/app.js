@@ -45,6 +45,14 @@ const controlsPanel = document.querySelector("#controlsPanel");
 const controlsDrawer = document.querySelector("#controlsDrawer");
 const controlsToggle = document.querySelector("#controlsToggle");
 const techniqueSearchResults = document.querySelector("#techniqueSearchResults");
+const videoPanel = document.querySelector("#videoPanel");
+const videoClose = document.querySelector("#videoClose");
+const videoSlider = document.querySelector("#videoSlider");
+const videoStart = document.querySelector("#videoStart");
+const videoEnd = document.querySelector("#videoEnd");
+const videoFps = document.querySelector("#videoFps");
+const videoSeconds = document.querySelector("#videoSeconds");
+const videoFrames = document.querySelector("#videoFrames");
 const emptyState = document.querySelector("#emptyState");
 const NEAR_BOTTOM_PX = 80;
 let palettesCache = [];
@@ -231,6 +239,13 @@ function renderRenderStatus(ev) {
   const cached = Math.max(0, Number(ev.cached_layers) || 0);
   const idx = Math.max(1, Number(ev.layer_index) || cached + 1);
   renderMeter.hidden = false;
+  if (ev.status === "video_frame") {
+    const f = Math.max(0, Number(ev.frame) || 0);
+    const t = Math.max(1, Number(ev.total_frames) || 1);
+    renderMeterLabel.textContent = `Rendering video · frame ${f}/${t}`;
+    setRenderMeter(f / t);
+    return;
+  }
   if (ev.status === "cached") {
     renderMeterLabel.textContent = `Cached render · ${total}/${total} layers · seed ${ev.seed}`;
     setRenderMeter(1);
@@ -583,7 +598,7 @@ function renderControlsPanel(panels) {
   const maxChain = currentControlsPanels.reduce((m, p) => Math.max(m, Number(p.chain_index) || 0), 0);
   const stack = [...currentControlsPanels].sort((a, b) => b.chain_index - a.chain_index).map(p => renderPanel(p, movableLayers, maxChain)).join("");
   const dirty = pendingControls.size ? " dirty" : "";
-  const regen = `<section class="ctl-actions"><button type="button" class="ctl-global${dirty}" id="globalRegenerate" title="Apply staged controls with the current seed"><span>Regenerate</span></button><button type="button" class="ctl-global${dirty}" id="globalRandomize" title="Apply staged controls with a fresh random seed"><span>Randomize</span></button></section>`;
+  const regen = `<section class="ctl-actions"><button type="button" class="ctl-global${dirty}" id="globalRegenerate" title="Apply staged controls with the current seed"><span>Regenerate</span></button><button type="button" class="ctl-global${dirty}" id="globalRandomize" title="Apply staged controls with a fresh random seed"><span>Randomize</span></button><button type="button" class="ctl-global" id="globalVideo" title="Make a video by sweeping a slider"><span>Video</span></button></section>`;
   controlsPanel.innerHTML = stack + regen;
   if (localStorage.sbDrawerOpen === "1") setControlsOpen(true);
   markDirtyControls();
@@ -770,6 +785,7 @@ controlsPanel.addEventListener("click", async e => {
     applyControls(global.id === "globalRandomize", global);
     return;
   }
+  if (e.target.closest("#globalVideo")) { openVideoPanel(); return; }
   const target = e.target;
   const remove = target.closest(".ctl-remove");
   if (remove) {
@@ -968,6 +984,114 @@ async function applyControls(forceNewSeed, btn) {
   }
 }
 function esc(x) { return String(x ?? "").replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+
+// ----- Video panel -----
+// Sweeps a slider from start→end, one frame per step, and downloads the clip.
+// The select value is "chain_index|name". Architecture stays open to multiple
+// sliders (the backend takes a list of specs) — V1 UI sweeps one at a time.
+function videoSliderOptions() {
+  const opts = [];
+  for (const panel of currentControlsPanels) {
+    for (const spec of (panel.schema || [])) {
+      if (spec.type !== "slider") continue;
+      opts.push({
+        chain_index: Number(panel.chain_index), name: spec.name,
+        label: `${panel.technique_name} · ${spec.label || spec.name}`,
+        min: Number(spec.min), max: Number(spec.max), step: Number(spec.step),
+        current: Number(stagedValue(panel.chain_index, spec.name, (panel.values && panel.values[spec.name] != null) ? panel.values[spec.name] : spec.default)),
+      });
+    }
+  }
+  return opts;
+}
+function videoSliderInfo() {
+  const val = videoSlider.value;
+  if (!val) return null;
+  const sep = val.indexOf("|");
+  const ci = Number(val.slice(0, sep));
+  const name = val.slice(sep + 1);
+  return videoSliderOptions().find(o => o.chain_index === ci && o.name === name) || null;
+}
+function applyVideoSliderDefaults() {
+  const info = videoSliderInfo();
+  if (!info) return;
+  videoStart.value = info.current;
+  videoStart.min = info.min; videoStart.max = info.max; videoStart.step = info.step;
+  videoEnd.value = info.max;
+  videoEnd.min = info.min; videoEnd.max = info.max; videoEnd.step = info.step;
+}
+function updateVideoFrames() {
+  const fps = Number(videoFps.value) || 0;
+  const secs = Number(videoSeconds.value) || 0;
+  const n = Math.round(fps * secs);
+  videoFrames.textContent = n >= 2 ? `${n} frames` : "— frames (raise fps or seconds)";
+}
+function refreshVideoTierLabels() {
+  videoPanel.querySelectorAll(".vp-size-btn").forEach(btn => {
+    const [w, h] = downloadDimsForScale(Number(btn.dataset.scale) || 1);
+    const dims = btn.querySelector(".vp-size-dims");
+    if (dims) dims.textContent = `${w} × ${h}`;
+  });
+}
+function openVideoPanel() {
+  const opts = videoSliderOptions();
+  if (!opts.length) { add("error", "This canvas has no sliders to animate."); return; }
+  videoSlider.innerHTML = opts.map(o => `<option value="${esc(o.chain_index + "|" + o.name)}">${esc(o.label)}</option>`).join("");
+  applyVideoSliderDefaults();
+  updateVideoFrames();
+  refreshVideoTierLabels();
+  techniqueSearchResults.hidden = true;
+  videoPanel.hidden = false;
+}
+function closeVideoPanel() {
+  videoPanel.hidden = true;
+}
+videoClose?.addEventListener("click", closeVideoPanel);
+videoSlider?.addEventListener("change", applyVideoSliderDefaults);
+videoFps?.addEventListener("input", updateVideoFrames);
+videoSeconds?.addEventListener("input", updateVideoFrames);
+videoPanel?.addEventListener("click", e => {
+  const btn = e.target.closest(".vp-size-btn");
+  if (btn) runVideoTier(btn);
+});
+async function runVideoTier(btn) {
+  if (btn.disabled) return;
+  const info = videoSliderInfo();
+  if (!info) { add("error", "Pick a slider first."); return; }
+  const fps = Math.round(Number(videoFps.value) || 0);
+  const seconds = Number(videoSeconds.value) || 0;
+  const scale = Number(btn.dataset.scale) || 1;
+  const spec = {chain_index: info.chain_index, name: info.name, start: Number(videoStart.value), end: Number(videoEnd.value)};
+  const labelEl = btn.querySelector(".vp-size-label");
+  const orig = labelEl ? labelEl.textContent : "";
+  videoPanel.querySelectorAll(".vp-size-btn").forEach(b => b.disabled = true);
+  btn.classList.add("loading");
+  if (labelEl) labelEl.textContent = "Rendering…";
+  loaderTicketStart();
+  try {
+    const r = await post("/api/render_video", {specs: [spec], controls: [...pendingControls.values()], fps, seconds, scale});
+    const ev = (r?.events || []).find(e => e.type === "video_ready");
+    if (!ev || !ev.url) {
+      const err = (r?.events || []).find(e => e.type === "error");
+      add("error", (err && err.content) || "Video failed.");
+      return;
+    }
+    const a = document.createElement("a");
+    a.href = ev.url;
+    a.download = `secondbrain-${ev.width}x${ev.height}-${ev.frames}f.gif`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  } catch (err) {
+    add("error", err.message);
+  } finally {
+    videoPanel.querySelectorAll(".vp-size-btn").forEach(b => b.disabled = false);
+    btn.classList.remove("loading");
+    if (labelEl) labelEl.textContent = orig;
+    loaderTicketEnd();
+    renderMeter.hidden = true;
+  }
+}
 
 // ----- Canvas loader bookkeeping -----
 let userTickets = 0;

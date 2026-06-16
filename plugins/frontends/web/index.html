@@ -99,6 +99,34 @@
       <div id="controlsDrawer" class="controls-drawer" hidden>
         <div id="techniqueSearchResults" class="technique-search-results" hidden></div>
         <div id="controlsPanel" class="controls-panel"></div>
+        <div id="videoPanel" class="video-panel" hidden>
+          <header class="vp-head">
+            <strong>Make a video</strong>
+            <button id="videoClose" type="button" class="vp-close" title="Back to controls" aria-label="Back to controls">✕</button>
+          </header>
+          <p class="vp-hint">Uses the controls above; choose one slider to sweep.</p>
+          <label class="vp-field"><span>Slider</span>
+            <select id="videoSlider"></select>
+          </label>
+          <div class="vp-grid">
+            <label class="vp-field"><span>Start</span><input id="videoStart" type="number" step="any"></label>
+            <label class="vp-field"><span>End</span><input id="videoEnd" type="number" step="any"></label>
+            <label class="vp-field"><span>FPS</span><input id="videoFps" type="number" min="1" max="30" step="1" value="24"></label>
+            <label class="vp-field"><span>Seconds</span><input id="videoSeconds" type="number" min="0.1" max="10" step="0.1" value="3"></label>
+          </div>
+          <p class="vp-frames" id="videoFrames">— frames</p>
+          <p class="vp-lead">Render &amp; download</p>
+          <div class="vp-tiers">
+            <button type="button" class="vp-size-btn" data-scale="0.5">
+              <span class="vp-size-label">Low</span>
+              <span class="vp-size-dims">— × —</span>
+            </button>
+            <button type="button" class="vp-size-btn" data-scale="1">
+              <span class="vp-size-label">Normal</span>
+              <span class="vp-size-dims">— × —</span>
+            </button>
+          </div>
+        </div>
       </div>
       <form id="chatForm" class="composer">
         <button id="controlsToggle" class="controls-toggle" type="button" aria-label="Controls" title="Controls" disabled>
