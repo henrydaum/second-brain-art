@@ -19,20 +19,23 @@ class PolarCoordinatesTechnique(BaseTechnique):
 
     def run(self, canvas):
         arr = canvas.image_array(mode="RGB", dtype="float")
-        s = canvas.size
+        W, H = int(canvas.width), int(canvas.height)
         rot = math.radians(float(self.rotation))
-        xx, yy, _, _ = art_kit.centered_grid(s)
-        cx = (s - 1) / 2.0
+        # Output a full W×H frame instead of a square that would be
+        # center-cropped: angle runs across the width, radius across the height.
+        xx, yy, _, _ = art_kit.centered_grid(W, H)
+        cx = (W - 1) / 2.0
+        cy = (H - 1) / 2.0
         if self.mode == 'to_polar':
-            theta = (xx / max(s - 1, 1)) * 2.0 * math.pi + rot
-            radius = (yy / max(s - 1, 1)) * (s / 2.0)
+            theta = (xx / max(W - 1, 1)) * 2.0 * math.pi + rot
+            radius = (yy / max(H - 1, 1)) * (H / 2.0)
             sx = cx + np.cos(theta) * radius
-            sy = cx + np.sin(theta) * radius
+            sy = cy + np.sin(theta) * radius
         else:
             dx = xx - cx
-            dy = yy - cx
+            dy = yy - cy
             r = np.sqrt(dx * dx + dy * dy)
             theta = (np.arctan2(dy, dx) - rot) % (2.0 * math.pi)
-            sx = (theta / (2.0 * math.pi)) * (s - 1)
-            sy = (r / (s / 2.0)) * (s - 1)
+            sx = (theta / (2.0 * math.pi)) * (W - 1)
+            sy = (r / (H / 2.0)) * (H - 1)
         canvas.commit_array(art_kit.bilinear_sample(arr, sx, sy))

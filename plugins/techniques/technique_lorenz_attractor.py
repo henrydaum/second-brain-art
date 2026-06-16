@@ -90,18 +90,27 @@ class LorenzAttractorTechnique(BaseTechnique):
         # Flip y so that increasing z reads upward visually for the xz projection.
         cy = s - cy
 
-        # Splat with a 3x3 cross stamp so the trajectory has weight at 1024^2 even
-        # though we only integrate ~200k points.
-        density = np.zeros((s, s), dtype=np.float32)
-        time_acc = np.zeros((s, s), dtype=np.float32)
+        # Splat into the centered W×H window we actually keep instead of the full
+        # s×s buffer. Indices are still clamped to the global square first (as
+        # before), then offset into the window and masked — so a point that the
+        # old code clamped to the square's edge lands outside the window and is
+        # dropped, exactly as the old center-crop discarded it.
+        W, H = int(canvas.width), int(canvas.height)
+        ox, oy = (W - s) // 2, (H - s) // 2
+
+        density = np.zeros((H, W), dtype=np.float32)
+        time_acc = np.zeros((H, W), dtype=np.float32)
         t_axis = np.linspace(0.0, 1.0, n_steps, dtype=np.float32)
+        cxi = cx.astype(np.int32)
+        cyi = cy.astype(np.int32)
         for dy in (-1, 0, 1):
             for dx in (-1, 0, 1):
                 w = 1.0 if (dy == 0 and dx == 0) else 0.5
-                ix2 = np.clip(cx.astype(np.int32) + dx, 0, s - 1)
-                iy2 = np.clip(cy.astype(np.int32) + dy, 0, s - 1)
-                np.add.at(density, (iy2, ix2), w)
-                np.add.at(time_acc, (iy2, ix2), t_axis * w)
+                ix2 = np.clip(cxi + dx, 0, s - 1) + ox
+                iy2 = np.clip(cyi + dy, 0, s - 1) + oy
+                m = (ix2 >= 0) & (ix2 < W) & (iy2 >= 0) & (iy2 < H)
+                np.add.at(density, (iy2[m], ix2[m]), w)
+                np.add.at(time_acc, (iy2[m], ix2[m]), t_axis[m] * w)
 
         safe = density > 0
         time_mean = np.zeros_like(time_acc)

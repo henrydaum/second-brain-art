@@ -21,13 +21,18 @@ class CrtTechnique(BaseTechnique):
         amt = float(self.amount)
         sl = float(self.scanline_intensity)
         arr = canvas.image_array(mode="RGB", dtype="float") * 255.0
-        s = canvas.size
-        xx, yy, nx, ny = art_kit.centered_grid(s)
-        cx = (s - 1) / 2.0
+        W, H = int(canvas.width), int(canvas.height)
+        xx, yy, nx, ny = art_kit.centered_grid(W, H)
+        cx = (W - 1) / 2.0
+        cy = (H - 1) / 2.0
+        # Un-normalize isotropically (same half on both axes) so the barrel
+        # distortion stays circular and the output fills W×H instead of a
+        # square that would be center-cropped.
+        half = max(cx, cy, 1.0)
         r2 = nx * nx + ny * ny
         scale = 1.0 + 0.18 * amt * r2
-        sx = cx + nx * scale * cx
-        sy = cx + ny * scale * cx
+        sx = cx + nx * scale * half
+        sy = cy + ny * scale * half
         ca = 4.0 * amt
         length = np.sqrt(r2) + 1e-6
         ux = nx / length
@@ -37,7 +42,7 @@ class CrtTechnique(BaseTechnique):
         b_plane = art_kit.bilinear_sample(arr[..., 2], sx - ux * ca, sy - uy * ca)
         out = np.stack([r_plane, g_plane, b_plane], axis=-1) / 255.0
 
-        rows = np.arange(s)
+        rows = np.arange(H)
         scan = (rows % 2 == 0).astype(np.float32) * sl
         out = out * (1.0 - scan[:, None, None])
 

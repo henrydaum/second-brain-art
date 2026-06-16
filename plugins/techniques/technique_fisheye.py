@@ -21,14 +21,18 @@ class FisheyeTechnique(BaseTechnique):
 
     def run(self, canvas):
         arr = canvas.image_array(mode="RGB", dtype="float")
-        s = canvas.size
-        ccx = self.cx * (s - 1)
-        ccy = self.cy * (s - 1)
-        yy, xx = np.mgrid[0:s, 0:s].astype(np.float32)
-        nx = (xx - ccx) / (s / 2.0)
-        ny = (yy - ccy) / (s / 2.0)
+        W, H = int(canvas.width), int(canvas.height)
+        ccx = self.cx * (W - 1)
+        ccy = self.cy * (H - 1)
+        # Normalize both axes by the same half-extent so the lens stays circular
+        # on non-square canvases; sample the full W×H frame directly instead of
+        # a square that would be center-cropped.
+        half = max(W, H) / 2.0
+        yy, xx = np.mgrid[0:H, 0:W].astype(np.float32)
+        nx = (xx - ccx) / half
+        ny = (yy - ccy) / half
         r = np.sqrt(nx * nx + ny * ny)
         scale = (1.0 + self.strength * (r * r)) / max(self.zoom, 1e-3)
-        sx = ccx + nx * scale * (s / 2.0)
-        sy = ccy + ny * scale * (s / 2.0)
+        sx = ccx + nx * scale * half
+        sy = ccy + ny * scale * half
         canvas.commit_array(art_kit.bilinear_sample(arr, sx, sy))

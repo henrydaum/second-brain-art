@@ -23,14 +23,21 @@ class MoireInterferenceTechnique(BaseTechnique):
         self.pattern = str(self.pattern)
         rng = np.random.default_rng(seed)
 
-        ys, xs = np.mgrid[0:s, 0:s].astype(np.float32)
+        # Sample a centered W×H window of the long-edge square so the wave
+        # field matches the old s×s render's center crop, without computing the
+        # cropped-away band.
+        W, H = int(canvas.width), int(canvas.height)
+        off_x, off_y = (s - W) / 2.0, (s - H) / 2.0
+        ys, xs = np.mgrid[0:H, 0:W].astype(np.float32)
+        xs += off_x
+        ys += off_y
         cx = s / 2.0
         cy = s / 2.0
         # Normalize coordinates to roughly [-1, 1] so wavelength constants stay scale-free.
         nx = (xs - cx) / (s * 0.5)
         ny = (ys - cy) / (s * 0.5)
 
-        field = np.zeros((s, s), dtype=np.float32)
+        field = np.zeros((H, W), dtype=np.float32)
         n_waves = 0
 
         if self.pattern == "beats":

@@ -17,9 +17,10 @@ class PixelateTechnique(BaseTechnique):
 
     def run(self, canvas):
         b = int(self.block_size)
-        s = canvas.size
-        small_w = max(1, s // b)
+        W, H = int(canvas.width), int(canvas.height)
+        small_w = max(1, W // b)
+        small_h = max(1, H // b)
         img = canvas.image.convert("RGBA")
-        tiny = img.resize((small_w, small_w), Image.BILINEAR)
-        out = tiny.resize((s, s), Image.NEAREST)
+        tiny = img.resize((small_w, small_h), Image.BILINEAR)
+        out = tiny.resize((W, H), Image.NEAREST)
         canvas.commit(out)

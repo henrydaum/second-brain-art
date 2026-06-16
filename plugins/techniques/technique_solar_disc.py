@@ -23,8 +23,15 @@ class SolarDiscTechnique(BaseTechnique):
         contrast = {"calm": 0.45, "fierce": 0.95, "eclipse": 1.25}.get(str(self.mood), 0.45)
         core = {"calm": 0.55, "fierce": 0.45, "eclipse": 0.28}.get(str(self.mood), 0.55)
 
+        # Sample a centered W×H window of the long-edge square; the disc center
+        # and radius stay anchored to `s`, so the output equals the old s×s
+        # render's center crop without evaluating the cropped band.
+        W, H = int(canvas.width), int(canvas.height)
+        off_x, off_y = (s - W) / 2.0, (s - H) / 2.0
         cx, cy = s / 2.0, s / 2.0
-        y_idx, x_idx = np.mgrid[0:s, 0:s].astype(np.float32)
+        y_idx, x_idx = np.mgrid[0:H, 0:W].astype(np.float32)
+        x_idx += off_x
+        y_idx += off_y
         dx = x_idx - cx
         dy = y_idx - cy
         r = np.sqrt(dx * dx + dy * dy) / (s * 0.5)

@@ -40,8 +40,16 @@ class WaveSeaTechnique(BaseTechnique):
 
         wf = art_kit.wave_field(sources)
 
-        y_idx, x_idx = np.mgrid[0:s, 0:s].astype(np.float32)
-        field = np.zeros((s, s), dtype=np.float32)
+        # Sample a centered W×H window of the same square coordinate space
+        # (sources/wavelengths stay anchored to the long edge `s`), so the
+        # field equals what the old s×s render would be center-cropped to —
+        # but we only evaluate the pixels that survive the crop.
+        W, H = int(canvas.width), int(canvas.height)
+        off_x, off_y = (s - W) / 2.0, (s - H) / 2.0
+        y_idx, x_idx = np.mgrid[0:H, 0:W].astype(np.float32)
+        x_idx += off_x
+        y_idx += off_y
+        field = np.zeros((H, W), dtype=np.float32)
         for cx, cy, wl, ph in sources:
             d = np.sqrt((x_idx - cx) ** 2 + (y_idx - cy) ** 2)
             field += np.sin(2.0 * math.pi * (d / max(wl, 1e-6) + ph))

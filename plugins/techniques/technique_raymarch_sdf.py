@@ -49,15 +49,21 @@ class RaymarchSdfTechnique(BaseTechnique):
     scene = Enum([('spheres', 'Three Spheres'), ('torus', 'Torus'), ('shapes', 'Mixed Shapes')], default='torus')
 
     def run(self, canvas):
-        s = int(canvas.size)
+        W, H = int(canvas.width), int(canvas.height)
         self.scene = str(self.scene)
 
-        # Render at half-res for speed, then upscale.
+        # Render at a fixed long-edge resolution, proportioned to the canvas
+        # aspect (short edge scaled down), then upscale to W×H. Coordinates are
+        # anchored to the long-edge half (R/2) so the scene stays centered and
+        # the same size as the old square render's center crop — we just skip
+        # marching the pixels that crop would have discarded.
         R = 512
-        # Normalize coords to roughly [-1, 1] across both axes.
-        ys, xs = np.mgrid[0:R, 0:R].astype(np.float32)
-        nx = (xs - R / 2.0) / (R / 2.0)
-        ny = (ys - R / 2.0) / (R / 2.0)
+        long_edge = max(W, H)
+        R_w = max(1, round(R * W / long_edge))
+        R_h = max(1, round(R * H / long_edge))
+        ys, xs = np.mgrid[0:R_h, 0:R_w].astype(np.float32)
+        nx = (xs - R_w / 2.0) / (R / 2.0)
+        ny = (ys - R_h / 2.0) / (R / 2.0)
 
         sdf_fns = {"spheres": _sdf_spheres, "torus": _sdf_torus, "shapes": _sdf_shapes}
         sdf = sdf_fns.get(self.scene, _sdf_spheres)
@@ -109,5 +115,5 @@ class RaymarchSdfTechnique(BaseTechnique):
         )
         idx = np.clip((t_field * (LUT - 1)).astype(np.int32), 0, LUT - 1)
         rgb = lut[idx]
-        img = Image.fromarray(rgb, "RGB").resize((s, s), Image.BICUBIC).convert("RGBA")
+        img = Image.fromarray(rgb, "RGB").resize((W, H), Image.BICUBIC).convert("RGBA")
         canvas.commit(img)

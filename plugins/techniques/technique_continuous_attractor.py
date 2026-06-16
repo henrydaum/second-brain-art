@@ -97,16 +97,24 @@ class ContinuousAttractorTechnique(BaseTechnique):
         cy = s - cy
         z_t = np.clip((zs - z_lo) / ((z_hi - z_lo) or 1.0), 0.0, 1.0)
 
-        # 3x3 splat so the trajectory has weight at full resolution.
-        density = np.zeros((s, s), dtype=np.float32)
-        z_acc = np.zeros((s, s), dtype=np.float32)
+        # 3x3 splat into the centered W×H window we keep (instead of the full
+        # s×s buffer). Clamp to the global square first, offset into the window,
+        # then mask — points the old code clamped to the square edge fall
+        # outside the window and drop out, exactly as the old center-crop did.
+        W, H = int(canvas.width), int(canvas.height)
+        ox, oy = (W - s) // 2, (H - s) // 2
+        density = np.zeros((H, W), dtype=np.float32)
+        z_acc = np.zeros((H, W), dtype=np.float32)
+        cxi = cx.astype(np.int32)
+        cyi = cy.astype(np.int32)
         for dy in (-1, 0, 1):
             for dx in (-1, 0, 1):
                 w = 1.0 if (dy == 0 and dx == 0) else 0.5
-                ix2 = np.clip(cx.astype(np.int32) + dx, 0, s - 1)
-                iy2 = np.clip(cy.astype(np.int32) + dy, 0, s - 1)
-                np.add.at(density, (iy2, ix2), w)
-                np.add.at(z_acc, (iy2, ix2), z_t * w)
+                ix2 = np.clip(cxi + dx, 0, s - 1) + ox
+                iy2 = np.clip(cyi + dy, 0, s - 1) + oy
+                m = (ix2 >= 0) & (ix2 < W) & (iy2 >= 0) & (iy2 < H)
+                np.add.at(density, (iy2[m], ix2[m]), w)
+                np.add.at(z_acc, (iy2[m], ix2[m]), z_t[m] * w)
 
         safe = density > 0
         z_mean = np.zeros_like(z_acc)

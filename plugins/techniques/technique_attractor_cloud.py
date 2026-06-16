@@ -85,11 +85,18 @@ class AttractorCloudTechnique(BaseTechnique):
         py_spread = py_hi - py_lo or 1.0
         cx = (xs - px_lo) / px_spread * span + margin
         cy = (ys - py_lo) / py_spread * span + margin
-        ix = np.clip(cx.astype(np.int32), 0, s - 1)
-        iy = np.clip(cy.astype(np.int32), 0, s - 1)
+        # Accumulate into the centered W×H window we keep (instead of the full
+        # s×s buffer). Clamp to the global square first, offset into the window,
+        # then mask — points the old code clamped to the square edge fall
+        # outside the window and drop out, exactly as the old center-crop did.
+        W, H = int(canvas.width), int(canvas.height)
+        ox, oy = (W - s) // 2, (H - s) // 2
+        ix = np.clip(cx.astype(np.int32), 0, s - 1) + ox
+        iy = np.clip(cy.astype(np.int32), 0, s - 1) + oy
+        m = (ix >= 0) & (ix < W) & (iy >= 0) & (iy < H)
 
-        density = np.zeros((s, s), dtype=np.float32)
-        np.add.at(density, (iy, ix), 1.0)
+        density = np.zeros((H, W), dtype=np.float32)
+        np.add.at(density, (iy[m], ix[m]), 1.0)
         density = np.log1p(density)
         dmax = float(density.max()) or 1.0
         density = (density / dmax) ** 0.7
