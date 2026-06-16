@@ -75,7 +75,13 @@ class Canvas:
 				step["controls"]["palette"] = palette_id
 
 	def apply_control(self, chain_index: int, name: str, value: Any) -> None:
-		"""Update one control on one layer."""
+		"""Update one control on one layer.
+
+		A per-layer palette override stays local to its layer; it must not
+		mutate the canvas-wide ``palette_id`` (that is what ``apply_palette``
+		is for). Otherwise every layer still resolving against the canvas
+		fallback would silently follow one layer's edit.
+		"""
 		if not (0 <= chain_index < len(self.layers)):
 			raise ValueError(f"chain_index {chain_index} out of range (len={len(self.layers)})")
 		step = dict(self.layers[chain_index])
@@ -83,8 +89,6 @@ class Canvas:
 		controls[name] = value
 		step["controls"] = controls
 		self.layers[chain_index] = step
-		if name == "palette" and isinstance(value, str):
-			self.palette_id = value
 
 	def delete_entry(self, chain_index: int) -> None:
 		"""Remove the layer at ``chain_index``."""

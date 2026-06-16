@@ -558,6 +558,11 @@ function paletteSwatchHtml(p, activeId) {
   const bars = colors.map(c => `<span style="background:${esc(c)}"></span>`).join("");
   return `<button type="button" class="${cls}" title="${esc(p.name)}" aria-label="${esc(p.name)}" aria-pressed="${p.id === activeId ? "true" : "false"}" data-palette="${esc(p.id)}">${bars}</button>`;
 }
+function paletteCurBars(activeId) {
+  const p = palettesCache.find(x => x.id === activeId);
+  if (!p) return "";
+  return Object.values(p.colors || {}).map(c => `<span style="background:${esc(c)}"></span>`).join("");
+}
 
 // ----- Controls drawer -----
 function renderControlsPanel(panels) {
@@ -743,14 +748,17 @@ function renderPanel(panel, movableLayers = 0, maxChain = 0) {
         <button type="button" class="ctl-move-btn" data-chain="${ci}" data-dir="down" ${downDisabled ? "disabled" : ""} title="Move layer down" aria-label="Move layer down">▼</button>
       </div>`
     : "";
-  const dirty = [...pendingControls.keys()].some(k => k.startsWith(`${panel.chain_index}.`)) ? " dirty" : "";
-  return `<section class="ctl-panel${dirty}" data-chain="${panel.chain_index}" data-kind="${esc(panel.kind || "")}" data-technique="${esc(panel.technique_name)}">
+  const kind = String(panel.kind || "").toLowerCase();
+  const depth = maxChain > 0 ? ci / maxChain : 0;
+  const subtitle = panel.kind ? esc(panel.kind) : `Layer ${panel.chain_index}`;
+  return `<section class="ctl-panel kind-${esc(kind)}" style="--depth:${depth.toFixed(3)}" data-chain="${panel.chain_index}" data-kind="${esc(panel.kind || "")}" data-technique="${esc(panel.technique_name)}">
     <header class="ctl-head">
       <div class="ctl-controls">
         <button type="button" class="ctl-remove" data-chain="${panel.chain_index}" title="Remove layer" aria-label="Remove layer"></button>
         ${moveBtns}
       </div>
-      <div><strong>${esc(panel.technique_name)}</strong><span>Layer ${panel.chain_index}${panel.kind ? ` · ${esc(panel.kind)}` : ""}</span></div>
+      <div><strong>${esc(panel.technique_name)}</strong><span>${subtitle}</span></div>
+      <span class="ctl-layer-num" aria-hidden="true">${ci}</span>
     </header>
     <div class="ctl-body">${empty}</div>
   </section>`;
@@ -787,6 +795,15 @@ controlsPanel.addEventListener("click", async e => {
     finally { loaderTicketEnd(); }
     return;
   }
+  const palTrigger = target.closest("[data-palette-trigger]");
+  if (palTrigger) {
+    const pop = palTrigger.parentElement.querySelector(".ctl-palette-pop");
+    const willOpen = pop.hidden;
+    controlsPanel.querySelectorAll(".ctl-palette-pop:not([hidden])").forEach(p => { if (p !== pop) p.hidden = true; });
+    pop.hidden = !willOpen;
+    palTrigger.setAttribute("aria-expanded", willOpen ? "true" : "false");
+    return;
+  }
   const sw = target.closest("button[data-palette]");
   if (sw) {
     const row = sw.closest(".ctl-palette");
@@ -796,6 +813,12 @@ controlsPanel.addEventListener("click", async e => {
       b.setAttribute("aria-pressed", b === sw ? "true" : "false");
     });
     stageControl({chain_index: chain, name: "palette", value: sw.dataset.palette});
+    const cur = row.querySelector(".ctl-palette-cur");
+    if (cur) cur.innerHTML = sw.innerHTML;
+    const pop = row.querySelector(".ctl-palette-pop");
+    if (pop) pop.hidden = true;
+    const trig = row.querySelector(".ctl-palette-trigger");
+    if (trig) trig.setAttribute("aria-expanded", "false");
     return;
   }
   if (target.matches(".ctl-seg")) {
@@ -820,6 +843,15 @@ controlsPanel.addEventListener("click", async e => {
     else stageControl({chain_index: ci, name: yp, value: y});
     return;
   }
+});
+document.addEventListener("click", e => {
+  const control = e.target.closest(".ctl-palette-control");
+  controlsPanel.querySelectorAll(".ctl-palette-pop:not([hidden])").forEach(pop => {
+    if (control && control.contains(pop)) return;
+    pop.hidden = true;
+    const trig = pop.parentElement.querySelector(".ctl-palette-trigger");
+    if (trig) trig.setAttribute("aria-expanded", "false");
+  });
 });
 controlsPanel.addEventListener("input", e => {
   const el = e.target;
@@ -848,34 +880,34 @@ function renderWidget(panel, spec) {
   const id = `c${panel.chain_index}-${spec.name}`;
   if (spec.type === "slider") {
     const cur = stagedValue(panel.chain_index, spec.name, v[spec.name] ?? spec.default);
-    return `<label class="ctl-row" for="${id}"><span>${esc(spec.label)}</span><input id="${id}" type="range" min="${spec.min}" max="${spec.max}" step="${spec.step}" value="${cur}" data-chain="${panel.chain_index}" data-name="${esc(spec.name)}" data-kind="slider"><span class="ctl-val">${fmtNum(cur)}</span></label>`;
+    return `<label class="ctl-row" for="${id}" data-chain="${panel.chain_index}" data-name="${esc(spec.name)}"><span>${esc(spec.label)}</span><input id="${id}" type="range" min="${spec.min}" max="${spec.max}" step="${spec.step}" value="${cur}" data-chain="${panel.chain_index}" data-name="${esc(spec.name)}" data-kind="slider"><span class="ctl-val">${fmtNum(cur)}</span></label>`;
   }
   if (spec.type === "bool") {
     const on = !!stagedValue(panel.chain_index, spec.name, v[spec.name] ?? spec.default);
-    return `<label class="ctl-row"><span>${esc(spec.label)}</span><input type="checkbox" ${on?"checked":""} data-chain="${panel.chain_index}" data-name="${esc(spec.name)}" data-kind="bool"></label>`;
+    return `<label class="ctl-row" data-chain="${panel.chain_index}" data-name="${esc(spec.name)}"><span>${esc(spec.label)}</span><input type="checkbox" ${on?"checked":""} data-chain="${panel.chain_index}" data-name="${esc(spec.name)}" data-kind="bool"></label>`;
   }
   if (spec.type === "enum") {
     const cur = stagedValue(panel.chain_index, spec.name, v[spec.name] ?? spec.default);
     const opts = (spec.options || []).map(o =>
       `<button type="button" class="${JSON.stringify(o.value)===JSON.stringify(cur)?"ctl-seg active":"ctl-seg"}" data-chain="${panel.chain_index}" data-name="${esc(spec.name)}" data-kind="enum" data-value='${esc(JSON.stringify(o.value))}'>${esc(o.label)}</button>`
     ).join("");
-    return `<div class="ctl-row"><span>${esc(spec.label)}</span><div class="ctl-segs">${opts}</div></div>`;
+    return `<div class="ctl-row" data-chain="${panel.chain_index}" data-name="${esc(spec.name)}"><span>${esc(spec.label)}</span><div class="ctl-segs">${opts}</div></div>`;
   }
   if (spec.type === "pan") {
     const xp = spec.x_param, yp = spec.y_param;
     const xv = stagedValue(panel.chain_index, xp, v[xp] ?? spec.x_default ?? 0);
     const yv = stagedValue(panel.chain_index, yp, v[yp] ?? spec.y_default ?? 0);
-    return `<div class="ctl-row"><span>${esc(spec.label)}</span><div class="ctl-pan" data-chain="${panel.chain_index}" data-name="${esc(spec.name)}" data-xparam="${esc(xp)}" data-yparam="${esc(yp)}" data-step="${spec.step}" data-x="${xv}" data-y="${yv}"><button type="button" class="ctl-pan-up" data-dir="up">↑</button><button type="button" class="ctl-pan-left" data-dir="left">←</button><span class="ctl-pan-c">${fmtNum(xv)}, ${fmtNum(yv)}</span><button type="button" class="ctl-pan-right" data-dir="right">→</button><button type="button" class="ctl-pan-down" data-dir="down">↓</button></div></div>`;
+    return `<div class="ctl-row" data-chain="${panel.chain_index}" data-xparam="${esc(xp)}" data-yparam="${esc(yp)}"><span>${esc(spec.label)}</span><div class="ctl-pan" data-chain="${panel.chain_index}" data-name="${esc(spec.name)}" data-xparam="${esc(xp)}" data-yparam="${esc(yp)}" data-step="${spec.step}" data-x="${xv}" data-y="${yv}"><button type="button" class="ctl-pan-up" data-dir="up">↑</button><button type="button" class="ctl-pan-left" data-dir="left">←</button><span class="ctl-pan-c">${fmtNum(xv)}, ${fmtNum(yv)}</span><button type="button" class="ctl-pan-right" data-dir="right">→</button><button type="button" class="ctl-pan-down" data-dir="down">↓</button></div></div>`;
   }
   if (spec.type === "text") {
     const cur = stagedValue(panel.chain_index, spec.name, v[spec.name] ?? spec.default ?? "");
     const ph = spec.placeholder ? ` placeholder="${esc(spec.placeholder)}"` : "";
-    return `<label class="ctl-row" for="${id}"><span>${esc(spec.label)}</span><input id="${id}" type="text" value="${esc(cur)}" maxlength="${spec.max_length || 120}"${ph} data-chain="${panel.chain_index}" data-name="${esc(spec.name)}" data-kind="text"></label>`;
+    return `<label class="ctl-row" for="${id}" data-chain="${panel.chain_index}" data-name="${esc(spec.name)}"><span>${esc(spec.label)}</span><input id="${id}" type="text" value="${esc(cur)}" maxlength="${spec.max_length || 120}"${ph} data-chain="${panel.chain_index}" data-name="${esc(spec.name)}" data-kind="text"></label>`;
   }
   if (spec.type === "palette") {
     const cur = stagedValue(panel.chain_index, "palette", v.palette || "");
     const swatches = palettesCache.map(p => paletteSwatchHtml(p, cur)).join("");
-    return `<div class="ctl-row ctl-palette" data-chain="${panel.chain_index}" data-name="palette"><span>${esc(spec.label || "Palette")}</span><div class="ctl-palette-strip">${swatches}</div></div>`;
+    return `<div class="ctl-row ctl-palette" data-chain="${panel.chain_index}" data-name="palette"><span>${esc(spec.label || "Palette")}</span><div class="ctl-palette-control"><button type="button" class="ctl-palette-trigger" data-palette-trigger aria-haspopup="true" aria-expanded="false"><span class="ctl-palette-cur">${paletteCurBars(cur)}</span><span class="ctl-palette-caret">▾</span></button><div class="ctl-palette-pop" hidden>${swatches}</div></div></div>`;
   }
   return "";
 }
@@ -899,8 +931,11 @@ function stageControl(body) {
   markDirtyControls();
 }
 function markDirtyControls() {
-  controlsPanel.querySelectorAll(".ctl-panel").forEach(p =>
-    p.classList.toggle("dirty", [...pendingControls.keys()].some(k => k.startsWith(`${p.dataset.chain}.`))));
+  controlsPanel.querySelectorAll(".ctl-row[data-chain]").forEach(row => {
+    const chain = row.dataset.chain;
+    const names = row.dataset.xparam ? [row.dataset.xparam, row.dataset.yparam] : [row.dataset.name];
+    row.classList.toggle("row-dirty", names.some(n => n && pendingControls.has(`${chain}.${n}`)));
+  });
   controlsPanel.querySelectorAll(".ctl-global").forEach(b => b.classList.toggle("dirty", pendingControls.size > 0));
 }
 function clearPendingControls(refresh = true) {

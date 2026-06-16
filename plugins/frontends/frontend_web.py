@@ -28,7 +28,7 @@ from canvas.state import CanvasState
 from events.event_bus import bus
 from events.event_channels import CANVAS_CHANGED, CANVAS_RENDER_STATUS
 from plugins.BaseFrontend import BaseFrontend, FrontendCapabilities, USER_BINDING_PER_USER
-from plugins.helpers.palettes import get_palette, list_palettes
+from plugins.helpers.palettes import DEFAULT_PALETTE_ID, get_palette, list_palettes
 from plugins.techniques.helpers.technique_store import anonymize_owner_in_dir, SANDBOX_TECHNIQUES
 from paths import DATA_DIR
 
@@ -1654,6 +1654,12 @@ def _canvas_payload_full(runtime, session_key: str, state: dict | None) -> dict:
         values = dict(step.get("controls") or {})
         if not any(c.get("type") == "palette" for c in schema):
             values.pop("palette", None)
+        elif not values.get("palette"):
+            # No per-layer override: surface the palette the layer actually
+            # renders with (the canvas fallback) so the control shows a real
+            # swatch instead of an ambiguous "Default" that silently shares
+            # state across layers.
+            values["palette"] = state.get("palette_id") or DEFAULT_PALETTE_ID
         panels.append({
             "chain_index": idx,
             "slug": getattr(technique, "slug", slug),
