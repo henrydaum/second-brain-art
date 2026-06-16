@@ -14,7 +14,8 @@ class ColorFieldTechnique(BaseTechnique):
     kind = "background"
     palette = Palette()
     mode = Enum([("solid", "Solid"), ("linear", "Linear Gradient"), ("radial", "Radial Gradient")], default="linear")
-    tone = Enum([("background", "Background"), ("primary", "Primary"), ("secondary", "Secondary"), ("accent", "Accent")], default="background")
+    # Order follows the palette swatch strip so buttons line up with swatches.
+    tone = Enum([("primary", "Primary"), ("secondary", "Secondary"), ("tertiary", "Tertiary"), ("accent", "Accent"), ("background", "Background")], default="background")
     angle = Slider(0, 360, default=35, step=5)
 
     def run(self, canvas):
@@ -24,6 +25,7 @@ class ColorFieldTechnique(BaseTechnique):
                 "background": canvas.palette.background,
                 "primary": canvas.palette.primary,
                 "secondary": canvas.palette.secondary,
+                "tertiary": canvas.palette.tertiary,
                 "accent": canvas.palette.accent,
             }
             canvas.commit(canvas.new(color=colors.get(str(self.tone), canvas.palette.background)))

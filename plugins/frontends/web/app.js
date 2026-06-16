@@ -836,7 +836,7 @@ controlsPanel.addEventListener("click", async e => {
     else if (arrow.dataset.dir === "up") y -= step;
     else if (arrow.dataset.dir === "down") y += step;
     pan.dataset.x = x; pan.dataset.y = y;
-    const cc = pan.querySelector(".ctl-pan-c"); if (cc) cc.textContent = `${fmtNum(x)}, ${fmtNum(y)}`;
+    const cc = pan.parentElement.querySelector(".ctl-pan-val"); if (cc) cc.textContent = `x ${fmtNum(x)} · y ${fmtNum(y)}`;
     const ci = +pan.dataset.chain;
     const xp = pan.dataset.xparam, yp = pan.dataset.yparam;
     if (arrow.dataset.dir === "left" || arrow.dataset.dir === "right") stageControl({chain_index: ci, name: xp, value: x});
@@ -860,6 +860,7 @@ controlsPanel.addEventListener("input", e => {
   if (el.dataset.kind === "slider") {
     const valEl = el.parentElement.querySelector(".ctl-val");
     if (valEl) valEl.textContent = fmtNum(+el.value);
+    el.style.setProperty("--fill", sliderPct(el.min, el.max, el.value) + "%");
     stageControl({chain_index: chain, name: el.dataset.name, value: +el.value});
   }
   if (el.dataset.kind === "text") {
@@ -880,7 +881,7 @@ function renderWidget(panel, spec) {
   const id = `c${panel.chain_index}-${spec.name}`;
   if (spec.type === "slider") {
     const cur = stagedValue(panel.chain_index, spec.name, v[spec.name] ?? spec.default);
-    return `<label class="ctl-row" for="${id}" data-chain="${panel.chain_index}" data-name="${esc(spec.name)}"><span>${esc(spec.label)}</span><input id="${id}" type="range" min="${spec.min}" max="${spec.max}" step="${spec.step}" value="${cur}" data-chain="${panel.chain_index}" data-name="${esc(spec.name)}" data-kind="slider"><span class="ctl-val">${fmtNum(cur)}</span></label>`;
+    return `<label class="ctl-row" for="${id}" data-chain="${panel.chain_index}" data-name="${esc(spec.name)}"><span>${esc(spec.label)}</span><input id="${id}" type="range" min="${spec.min}" max="${spec.max}" step="${spec.step}" value="${cur}" style="--fill:${sliderPct(spec.min, spec.max, cur)}%" data-chain="${panel.chain_index}" data-name="${esc(spec.name)}" data-kind="slider"><span class="ctl-val">${fmtNum(cur)}</span></label>`;
   }
   if (spec.type === "bool") {
     const on = !!stagedValue(panel.chain_index, spec.name, v[spec.name] ?? spec.default);
@@ -897,7 +898,7 @@ function renderWidget(panel, spec) {
     const xp = spec.x_param, yp = spec.y_param;
     const xv = stagedValue(panel.chain_index, xp, v[xp] ?? spec.x_default ?? 0);
     const yv = stagedValue(panel.chain_index, yp, v[yp] ?? spec.y_default ?? 0);
-    return `<div class="ctl-row" data-chain="${panel.chain_index}" data-xparam="${esc(xp)}" data-yparam="${esc(yp)}"><span>${esc(spec.label)}</span><div class="ctl-pan" data-chain="${panel.chain_index}" data-name="${esc(spec.name)}" data-xparam="${esc(xp)}" data-yparam="${esc(yp)}" data-step="${spec.step}" data-x="${xv}" data-y="${yv}"><button type="button" class="ctl-pan-up" data-dir="up">↑</button><button type="button" class="ctl-pan-left" data-dir="left">←</button><span class="ctl-pan-c">${fmtNum(xv)}, ${fmtNum(yv)}</span><button type="button" class="ctl-pan-right" data-dir="right">→</button><button type="button" class="ctl-pan-down" data-dir="down">↓</button></div></div>`;
+    return `<div class="ctl-row" data-chain="${panel.chain_index}" data-xparam="${esc(xp)}" data-yparam="${esc(yp)}"><span>${esc(spec.label)}</span><div class="ctl-pan" data-chain="${panel.chain_index}" data-name="${esc(spec.name)}" data-xparam="${esc(xp)}" data-yparam="${esc(yp)}" data-step="${spec.step}" data-x="${xv}" data-y="${yv}"><button type="button" class="ctl-pan-up" data-dir="up">↑</button><button type="button" class="ctl-pan-left" data-dir="left">←</button><span class="ctl-pan-c"></span><button type="button" class="ctl-pan-right" data-dir="right">→</button><button type="button" class="ctl-pan-down" data-dir="down">↓</button></div><span class="ctl-val ctl-pan-val">x ${fmtNum(xv)} · y ${fmtNum(yv)}</span></div>`;
   }
   if (spec.type === "text") {
     const cur = stagedValue(panel.chain_index, spec.name, v[spec.name] ?? spec.default ?? "");
@@ -915,6 +916,11 @@ function fmtNum(v) {
   if (typeof v !== "number") return String(v);
   const abs = Math.abs(v);
   return abs >= 100 ? v.toFixed(0) : abs >= 10 ? v.toFixed(1) : v.toFixed(2);
+}
+function sliderPct(min, max, val) {
+  const lo = Number(min), hi = Number(max), v = Number(val);
+  if (!(hi > lo)) return 0;
+  return Math.max(0, Math.min(100, ((v - lo) / (hi - lo)) * 100));
 }
 function controlKey(chain, name) { return `${chain}.${name}`; }
 function stagedValue(chain, name, fallback) {

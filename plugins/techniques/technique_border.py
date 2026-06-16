@@ -9,7 +9,9 @@ class BorderTechnique(BaseTechnique):
     kind = "object"
     palette = Palette()
     width = Slider(1, 80, default=18, step=1)
-    color = Enum([("background", "Background"), ("primary", "Primary"), ("secondary", "Secondary"), ("tertiary", "Tertiary"), ("accent", "Accent")], default="accent")
+    # Order matches the palette swatch strip (primary→background) so the Nth
+    # button lines up with the Nth swatch the user sees.
+    color = Enum([("primary", "Primary"), ("secondary", "Secondary"), ("tertiary", "Tertiary"), ("accent", "Accent"), ("background", "Background")], default="accent")
 
     def run(self, canvas):
         colors = {
