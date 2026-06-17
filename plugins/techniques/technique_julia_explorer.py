@@ -20,25 +20,26 @@ _SPOTS = {
 }
 
 
+def _zoom_multiplier(zoom_extra):
+    return float(2.0 ** (float(zoom_extra) - 1.0))
+
+
 class JuliaExplorerTechnique(BaseTechnique):
     name = 'Julia Explorer'
-    description = 'A guided tour of the most beloved filled Julia sets. Pick a constant -- the spindly Dendrite, the Douady Rabbit, the curling Dragon, the Siegel Disk, the cantor-dust airplane -- and the right framing and iteration depth come along for free. Pair with any palette. Pan, zoom, and iteration controls let you wander off the preset and chase your own detail. Optimized for M1: complex64 working set, |z0| pre-escape filter, and live-buffer compaction every 3 iterations.'
+    description = 'A guided tour of the most beloved filled Julia sets. Pick a constant -- the spindly Dendrite, the Douady Rabbit, the curling Dragon, the Siegel Disk, the cantor-dust airplane -- and the right framing and iteration depth come along for free. Center uses literal complex-plane coordinates and Zoom moves in even doubling steps. Optimized for M1: complex64 working set, |z0| pre-escape filter, and live-buffer compaction every 3 iterations.'
     kind = "background"
     palette = Palette()
     spot = Enum([('dendrite', 'Dendrite'), ('rabbit', 'Douady Rabbit'), ('san_marco', 'San Marco'), ('siegel', 'Siegel Disk'), ('dragon', 'Dragon'), ('spiral', 'Spiral'), ('airplane', 'Airplane'), ('dust', 'Cantor Dust')], default='dragon')
-    # Pan range ±3 (= 1.5 view-widths to either side) so you can navigate
-    # between adjacent features at deep zoom; capping at ±1 only let you
-    # move by half a screen, which felt like nothing once zoomed in.
-    pan_x = Slider(-3.0, 3.0, default=0.0, step=0.05)
-    pan_y = Slider(-3.0, 3.0, default=0.0, step=0.05)
-    pan = Pan(x='pan_x', y='pan_y', label='Pan')
-    zoom_extra = Slider(0.5, 32.0, default=1.0, step=0.05, label='Zoom')
+    pan_x = Slider(-2.0, 2.0, default=0.0, step=0.05)
+    pan_y = Slider(-2.0, 2.0, default=0.0, step=0.05)
+    pan = Pan(x='pan_x', y='pan_y', label='Center')
+    zoom_extra = Slider(0.0, 20.0, default=1.0, step=1, label='Zoom')
     iterations = Slider(0, 3000, default=1500, step=10, label='Iterations')
 
     def run(self, canvas):
         jx, jy, zoom_exp, detail = _SPOTS.get(str(self.spot), _SPOTS["dragon"])
         W, H = int(canvas.width), int(canvas.height)
-        zoom = float(2.0 ** zoom_exp) * float(self.zoom_extra)
+        zoom = float(2.0 ** zoom_exp) * _zoom_multiplier(self.zoom_extra)
         iter_override = int(self.iterations)
         n_iter = iter_override if iter_override >= 50 else int(detail)
 
@@ -60,9 +61,8 @@ class JuliaExplorerTechnique(BaseTechnique):
         long_edge = max(W, H)
         half_x = half * W / long_edge
         half_y = half * H / long_edge
-        # Pan offsets the view center; ±1 on the slider moves by a full half-view.
-        offset_x = float(self.pan_x) * half
-        offset_y = float(self.pan_y) * half
+        offset_x = float(self.pan_x)
+        offset_y = float(self.pan_y)
         re = np.linspace(-half_x + offset_x, half_x + offset_x, W, dtype=real)
         im = np.linspace(-half_y + offset_y, half_y + offset_y, H, dtype=real)
         R, I = np.meshgrid(re, im)  # both (H, W)

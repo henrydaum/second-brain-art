@@ -23,19 +23,20 @@ def _polys():
     }
 
 
+def _zoom_multiplier(zoom_extra):
+    return float(2.0 ** (float(zoom_extra) - 1.0))
+
+
 class NewtonBasinsExplorerTechnique(BaseTechnique):
     name = 'Newton Basins Explorer'
-    description = 'Newton\'s method on a complex polynomial, colored by basin of attraction. Each pixel iterates z = z - f(z)/f\'(z); the root it converges to picks the palette band, the iteration count modulates brightness within the band. Produces lacy, intricate boundaries between basins -- a different geometry than escape-time fractals. Pan, zoom, and iteration controls let you dive into the lace between roots and chase your own detail. Good for "fractal", "newton", "basins", "lace", "stained glass", or any mathematically-elaborate algorithmic motif.'
+    description = 'Newton\'s method on a complex polynomial, colored by basin of attraction. Each pixel iterates z = z - f(z)/f\'(z); the root it converges to picks the palette band, the iteration count modulates brightness within the band. Center uses literal complex-plane coordinates and Zoom moves in even doubling steps. Good for "fractal", "newton", "basins", "lace", "stained glass", or any mathematically-elaborate algorithmic motif.'
     kind = "background"
     palette = Palette()
     polynomial = Enum([('cubic', 'z^3 - 1 (three roots)'), ('perturbed', 'z^3 - 2z + 2 (cycles)'), ('quartic', 'z^4 - 1 (four roots)'), ('quintic', 'z^5 - 1 (five roots)'), ('sextic', 'z^6 - 1 (six roots)'), ('octic', 'z^8 - 1 (eight roots)')], default='cubic')
-    # Pan range ±3 (= 1.5 view-widths to either side) so you can navigate
-    # between adjacent features at deep zoom; capping at ±1 only let you
-    # move by half a screen, which felt like nothing once zoomed in.
-    pan_x = Slider(-3.0, 3.0, default=0.0, step=0.05)
-    pan_y = Slider(-3.0, 3.0, default=0.0, step=0.05)
-    pan = Pan(x='pan_x', y='pan_y', label='Pan')
-    zoom_extra = Slider(0.5, 32.0, default=1.0, step=0.05, label='Zoom')
+    pan_x = Slider(-2.0, 2.0, default=0.0, step=0.05)
+    pan_y = Slider(-2.0, 2.0, default=0.0, step=0.05)
+    pan = Pan(x='pan_x', y='pan_y', label='Center')
+    zoom_extra = Slider(0.0, 20.0, default=1.0, step=1, label='Zoom')
     iterations = Slider(0, 3000, default=1500, step=10, label='Iterations')
 
     def run(self, canvas):
@@ -44,7 +45,7 @@ class NewtonBasinsExplorerTechnique(BaseTechnique):
         polys = _polys()
         f, fp, roots, view_half = polys.get(key, polys["cubic"])
 
-        zoom_extra = float(self.zoom_extra)
+        zoom_extra = _zoom_multiplier(self.zoom_extra)
         iter_override = int(self.iterations)
         n_iter = iter_override if iter_override >= 50 else 40
 
@@ -63,9 +64,8 @@ class NewtonBasinsExplorerTechnique(BaseTechnique):
         long_edge = max(W, H)
         re_half = half * W / long_edge
         im_half = half * H / long_edge
-        # Pan offsets the view center; ±1 on the slider moves by a full half-view.
-        offset_x = float(self.pan_x) * half
-        offset_y = float(self.pan_y) * half
+        offset_x = float(self.pan_x)
+        offset_y = float(self.pan_y)
         re = np.linspace(-re_half + offset_x, re_half + offset_x, W, dtype=real)
         im = np.linspace(-im_half + offset_y, im_half + offset_y, H, dtype=real)
         R, I = np.meshgrid(re, im)  # both (H, W)

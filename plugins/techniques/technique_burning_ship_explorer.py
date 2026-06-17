@@ -18,9 +18,20 @@ _SPOTS = {
 }
 
 
+def _target_center(spot, pan_x, pan_y):
+    key = str(spot)
+    if key == "full" or key not in _SPOTS:
+        return float(pan_x), float(pan_y)
+    return _SPOTS[key][0], _SPOTS[key][1]
+
+
+def _zoom_multiplier(zoom_extra):
+    return float(2.0 ** (float(zoom_extra) - 1.0))
+
+
 class BurningShipExplorerTechnique(BaseTechnique):
     name = 'Burning Ship Explorer'
-    description = 'A guided tour of the Burning Ship fractal -- the inferno cousin of the Mandelbrot set. Jagged, ship-like silhouettes with antennas, masts, and embedded mini-ships. Pan, zoom, and iteration controls let you wander off the preset and chase your own detail. Optimized: paired-real working set (the |Re|/|Im| step doesn\'t fit numpy complex), live-buffer compaction every 3 iterations.'
+    description = 'A guided tour of the Burning Ship fractal -- the inferno cousin of the Mandelbrot set. Full Set uses Center as literal complex-plane coordinates; landmark presets supply their own center, zoom, and iteration depth. Optimized: paired-real working set (the |Re|/|Im| step doesn\'t fit numpy complex), live-buffer compaction every 3 iterations.'
     kind = "background"
 
     palette = Palette()
@@ -32,19 +43,17 @@ class BurningShipExplorerTechnique(BaseTechnique):
         ('mast',      'Mast Spire'),
         ('deep_keel', 'Deep Keel'),
     ], default='main_ship')
-    # Pan range ±3 (= 1.5 view-widths to either side) so you can navigate
-    # between adjacent features at deep zoom; capping at ±1 only let you
-    # move by half a screen, which felt like nothing once zoomed in.
-    pan_x = Slider(-3.0, 3.0, default=0.0, step=0.05)
-    pan_y = Slider(-3.0, 3.0, default=0.0, step=0.05)
-    pan = Pan(x='pan_x', y='pan_y', label='Pan')
-    zoom_extra = Slider(0.5, 32.0, default=1.0, step=0.05, label='Zoom')
+    pan_x = Slider(-2.5, 1.0, default=-0.5, step=0.05)
+    pan_y = Slider(-2.0, 1.0, default=-0.5, step=0.05)
+    pan = Pan(x='pan_x', y='pan_y', label='Center')
+    zoom_extra = Slider(0.0, 20.0, default=1.0, step=1, label='Zoom')
     iterations = Slider(0, 3000, default=1500, step=10, label='Iterations')
 
     def run(self, canvas):
-        cx, cy, zoom_exp, detail = _SPOTS.get(str(self.spot), _SPOTS["main_ship"])
+        _, _, zoom_exp, detail = _SPOTS.get(str(self.spot), _SPOTS["main_ship"])
+        cx_eff, cy_eff = _target_center(self.spot, self.pan_x, self.pan_y)
         W, H = int(canvas.width), int(canvas.height)
-        zoom = float(2.0 ** zoom_exp) * float(self.zoom_extra)
+        zoom = float(2.0 ** zoom_exp) * _zoom_multiplier(self.zoom_extra)
         iter_override = int(self.iterations)
         n_iter = iter_override if iter_override >= 50 else int(detail)
 
@@ -61,9 +70,6 @@ class BurningShipExplorerTechnique(BaseTechnique):
         long_edge = max(W, H)
         half_x = half * W / long_edge
         half_y = half * H / long_edge
-        # Pan offsets the view center; ±1 on the slider moves by a full half-view.
-        cx_eff = cx + float(self.pan_x) * half
-        cy_eff = cy + float(self.pan_y) * half
         re = np.linspace(cx_eff - half_x, cx_eff + half_x, W, dtype=real)
         # im linspace is reversed so the ship silhouette reads right-side up.
         im = np.linspace(cy_eff + half_y, cy_eff - half_y, H, dtype=real)

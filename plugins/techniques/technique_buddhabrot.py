@@ -9,34 +9,35 @@ except NameError:
     art_kit = None
 
 
+def _zoom_multiplier(zoom_extra):
+    return float(2.0 ** (float(zoom_extra) - 1.0))
+
+
 class BuddhabrotTechnique(BaseTechnique):
     name = 'Buddhabrot'
-    description = 'The Mandelbrot rendered backwards: sample random c values, iterate z = z^2 + c, and if the orbit escapes, plot every z it visited along the way into a 2D density buffer. The accumulated trajectories form a luminous, Buddha-like figure -- ghostly internal structure that the standard escape-time render hides. Monte Carlo, so more samples = smoother. Pan, zoom, and iteration controls let you frame the figure and dial up trajectory length; density controls how many samples to fire.'
+    description = 'The Mandelbrot rendered backwards: sample random c values, iterate z = z^2 + c, and if the orbit escapes, plot every z it visited along the way into a 2D density buffer. Center uses literal complex-plane coordinates and Zoom moves in even doubling steps. Monte Carlo, so more samples = smoother; density controls how many samples to fire.'
     kind = "background"
 
     palette = Palette()
     iterations = Slider(100, 2000, default=1000, step=10, label='Iterations')
     density_boost = Slider(0.5, 5.0, default=1.0, step=0.1, label='Density')
-    # Pan range ±3 (= 1.5 view-widths to either side) for consistency with the
-    # other fractal explorers. Default view is the whole figure.
-    pan_x = Slider(-3.0, 3.0, default=0.0, step=0.05)
-    pan_y = Slider(-3.0, 3.0, default=0.0, step=0.05)
-    pan = Pan(x='pan_x', y='pan_y', label='Pan')
-    zoom_extra = Slider(0.5, 32.0, default=1.4, step=0.05, label='Zoom')
+    pan_x = Slider(-2.5, 1.0, default=-0.5, step=0.05)
+    pan_y = Slider(-1.5, 1.5, default=0.0, step=0.05)
+    pan = Pan(x='pan_x', y='pan_y', label='Center')
+    zoom_extra = Slider(0.0, 20.0, default=1.0, step=1, label='Zoom')
 
     def run(self, canvas):
         s = int(canvas.size)
         seed = int(canvas.seed)
         n_iter = int(self.iterations)
         density = float(self.density_boost)
-        zoom = float(self.zoom_extra)
+        zoom = _zoom_multiplier(self.zoom_extra)
 
         # View bounds in c-space (= same coords as the z trajectories we plot).
-        # Center on (-0.5, 0) -- the Mandelbrot's natural center -- and frame
-        # a 3-unit-wide window at zoom=1 so the whole figure fits.
+        # Frame a 3-unit-wide c-space window at zoom=1 so the whole figure fits.
         view_half = 1.5 / zoom
-        view_cx = -0.5 + float(self.pan_x) * view_half
-        view_cy = 0.0  + float(self.pan_y) * view_half
+        view_cx = float(self.pan_x)
+        view_cy = float(self.pan_y)
 
         rng = np.random.default_rng(seed)
         hist = np.zeros((s, s), dtype=np.float32)
