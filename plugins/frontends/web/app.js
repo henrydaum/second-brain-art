@@ -48,8 +48,7 @@ const techniqueSearchResults = document.querySelector("#techniqueSearchResults")
 const videoPanel = document.querySelector("#videoPanel");
 const videoClose = document.querySelector("#videoClose");
 const videoSlider = document.querySelector("#videoSlider");
-const videoStart = document.querySelector("#videoStart");
-const videoEnd = document.querySelector("#videoEnd");
+const videoRange = document.querySelector("#videoRange");
 const videoFps = document.querySelector("#videoFps");
 const videoSeconds = document.querySelector("#videoSeconds");
 const videoFrames = document.querySelector("#videoFrames");
@@ -1015,10 +1014,7 @@ function videoSliderInfo() {
 function applyVideoSliderDefaults() {
   const info = videoSliderInfo();
   if (!info) return;
-  videoStart.value = info.current;
-  videoStart.min = info.min; videoStart.max = info.max; videoStart.step = info.step;
-  videoEnd.value = info.max;
-  videoEnd.min = info.min; videoEnd.max = info.max; videoEnd.step = info.step;
+  if (videoRange) videoRange.textContent = `Sweeps ${fmtNum(info.min)} → ${fmtNum(info.max)}`;
 }
 function updateVideoFrames() {
   const fps = Number(videoFps.value) || 0;
@@ -1061,7 +1057,7 @@ async function runVideoTier(btn) {
   const fps = Math.round(Number(videoFps.value) || 0);
   const seconds = Number(videoSeconds.value) || 0;
   const scale = Number(btn.dataset.scale) || 1;
-  const spec = {chain_index: info.chain_index, name: info.name, start: Number(videoStart.value), end: Number(videoEnd.value)};
+  const spec = {chain_index: info.chain_index, name: info.name};
   const labelEl = btn.querySelector(".vp-size-label");
   const orig = labelEl ? labelEl.textContent : "";
   videoPanel.querySelectorAll(".vp-size-btn").forEach(b => b.disabled = true);

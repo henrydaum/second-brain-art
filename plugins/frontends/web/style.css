@@ -181,6 +181,7 @@ article.credit-error { display: grid; gap: 7px; color: var(--muted); background:
 .video-panel .vp-field input { height: 32px; padding: 0 8px; border: 1px solid var(--line); background: #10141e; color: var(--text); font-size: 12px; }
 .video-panel .vp-field select:focus,
 .video-panel .vp-field input:focus { outline: none; border-color: var(--accent); }
+.video-panel .vp-range { margin: -3px 0 0; color: var(--muted); font-size: 10.5px; font-family: ui-monospace, "Cascadia Code", "Consolas", monospace; }
 .video-panel .vp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .video-panel .vp-frames { margin: 0; font-size: 11px; color: var(--text); font-family: ui-monospace, "Cascadia Code", "Consolas", monospace; }
 .video-panel .vp-lead { margin: 4px 0 0; font-size: 10.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }

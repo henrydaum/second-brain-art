@@ -776,9 +776,10 @@ class WebFrontend(BaseFrontend):
                      fps=None, seconds=None, fmt: str = "gif", scale=1.0) -> list[dict]:
         """Render a slider sweep into an animated file and return a download URL.
 
-        ``specs`` is a list of ``{chain_index, name, start, end}`` — V1 UI sends
-        one, but the backend already handles N (architecture stays open to
-        multi-slider sweeps). Frame ``i`` value = ``start + delta*i`` where
+        ``specs`` is a list of ``{chain_index, name}`` — V1 UI sends one, but
+        the backend already handles N (architecture stays open to multi-slider
+        sweeps). Each slider runs from its declared minimum to maximum.
+        Frame ``i`` value = ``start + delta*i`` where
         ``delta = (end - start) / (frame_count - 1)``; reversing (end < start) is
         allowed. Sweep is constant/linear for now.
         """
@@ -961,13 +962,9 @@ class WebFrontend(BaseFrontend):
             if ctrl is None:
                 return (False, f"layer {ci} has no slider named '{name}'", {})
             lo, hi = float(ctrl["min"]), float(ctrl["max"])
-            try:
-                start = float(spec.get("start"))
-                end = float(spec.get("end"))
-            except (TypeError, ValueError):
-                return (False, "start/end must be numbers", {})
-            start = max(lo, min(hi, start))
-            end = max(lo, min(hi, end))
+            start, end = lo, hi
+            if start == end:
+                return (False, "start and end must be different", {})
             delta = (end - start) / (frame_count - 1)
             plans.append({"chain_index": ci, "name": name, "start": start,
                           "end": end, "min": lo, "max": hi, "delta": delta})
