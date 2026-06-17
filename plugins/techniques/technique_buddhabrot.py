@@ -24,7 +24,7 @@ class BuddhabrotTechnique(BaseTechnique):
     pan_x = Slider(-2.5, 1.0, default=-0.5, step=0.05)
     pan_y = Slider(-1.5, 1.5, default=0.0, step=0.05)
     pan = Pan(x='pan_x', y='pan_y', label='Center')
-    zoom_extra = Slider(0.0, 20.0, default=1.0, step=1, label='Zoom')
+    zoom_extra = Slider(0.0, 10.0, default=1.0, step=0.5, label='Zoom')
 
     def run(self, canvas):
         s = int(canvas.size)
