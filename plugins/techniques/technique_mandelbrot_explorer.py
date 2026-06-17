@@ -26,23 +26,27 @@ def _target_center(spot, pan_x, pan_y):
     return _SPOTS[key][0], _SPOTS[key][1]
 
 
+def _zoom_multiplier(zoom_extra):
+    return float(2.0 ** (float(zoom_extra) - 1.0))
+
+
 class MandelbrotExplorerTechnique(BaseTechnique):
     name = 'Mandelbrot Explorer'
     description = "A guided tour of the Mandelbrot set's most famous landmarks. Full Set uses Center as literal complex-plane coordinates, so x=-2, y=0 lands on the left dendrite tip. Landmark presets supply their own center, zoom, and iteration depth. Pair with any palette to taste. Optimized for M1: complex64 working set, cardioid + period-2 bulb early-exit, and live-buffer compaction every 3 iterations."
     kind = "background"
     palette = Palette()
     spot = Enum([('full', 'Full Set'), ('dendrite_tip', 'Dendrite Tip'), ('seahorse', 'Seahorse Valley'), ('elephant', 'Elephant Valley'), ('triple_spiral', 'Triple Spiral'), ('lightning', 'Lightning'), ('spiral_galaxy', 'Spiral Galaxy')], default='full')
-    pan_x = Slider(-2.5, 1.0, default=-0.5, step=0.01)
-    pan_y = Slider(-1.5, 1.5, default=0.0, step=0.01)
+    pan_x = Slider(-2.5, 1.0, default=-0.75, step=0.05)
+    pan_y = Slider(-1.5, 1.5, default=0.0, step=0.05)
     pan = Pan(x='pan_x', y='pan_y', label='Center')
-    zoom_extra = Slider(0.5, 32.0, default=1.0, step=0.05, label='Zoom')
+    zoom_extra = Slider(0.0, 10.0, default=1.0, step=0.5, label='Zoom')
     iterations = Slider(0, 3000, default=1500, step=10, label='Iterations')
 
     def run(self, canvas):
         _, _, zoom_exp, detail = _SPOTS.get(str(self.spot), _SPOTS["full"])
         cx_eff, cy_eff = _target_center(self.spot, self.pan_x, self.pan_y)
         W, H = int(canvas.width), int(canvas.height)
-        zoom = float(2.0 ** zoom_exp) * float(self.zoom_extra)
+        zoom = float(2.0 ** zoom_exp) * _zoom_multiplier(self.zoom_extra)
         iter_override = int(self.iterations)
         n_iter = iter_override if iter_override >= 50 else int(detail)
 
