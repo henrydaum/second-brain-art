@@ -17,11 +17,13 @@ class MengerSponge3DTechnique(BaseTechnique):
     pitch = Slider(0, 1, default=0.36, step=0.03)
     rotation = Pan(x="yaw", y="pitch")
     scale = Slider(0.55, 1.35, default=0.95, step=0.05)
+    cutout_phase = Slider(0, 1, default=0, step=0.01, loop=True, label="Morph")
     depth = Slider(1, 3, default=2, step=1, label="Depth")
     outline = Bool(default=False)
 
     def _centers(self, depth):
-        cubes = [(0.0, 0.0, 0.0, 1.55 * float(self.scale))]
+        breath = 1.0 + 0.08 * math.sin(math.tau * float(self.cutout_phase))
+        cubes = [(0.0, 0.0, 0.0, 1.55 * float(self.scale) * breath)]
         for _ in range(depth):
             next_cubes = []
             for cx, cy, cz, size in cubes:

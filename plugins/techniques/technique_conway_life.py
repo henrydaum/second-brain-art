@@ -1,5 +1,6 @@
-from plugins.BaseTechnique import BaseTechnique, Enum, Palette
+from plugins.BaseTechnique import BaseTechnique, Enum, Palette, Slider
 
+import math
 import numpy as np
 from PIL import Image
 
@@ -76,6 +77,7 @@ class ConwayLifeTechnique(BaseTechnique):
     kind = "background"
     palette = Palette()
     seed_pattern = Enum([('soup', 'Random Soup'), ('r_pentomino', 'R-pentomino'), ('glider_gun', 'Glider Gun'), ('acorn', 'Acorn'), ('replicator', 'Replicator')], default='soup', label='Seed')
+    time = Slider(0, 1, default=0.5, step=0.01, loop=True)
 
     def run(self, canvas):
         s = int(canvas.size)
@@ -86,6 +88,7 @@ class ConwayLifeTechnique(BaseTechnique):
         N = 256
         n_steps = {"soup": 600, "r_pentomino": 700, "glider_gun": 400,
                    "acorn": 800, "replicator": 240}.get(kind, 500)
+        n_steps = int(round(n_steps * math.sin(math.pi * float(self.time))))
 
         g = _seed_grid(N, kind, seed)
         decay = np.zeros((N, N), dtype=np.float32)

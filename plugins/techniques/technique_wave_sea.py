@@ -1,4 +1,4 @@
-from plugins.BaseTechnique import BaseTechnique, Enum, Palette
+from plugins.BaseTechnique import BaseTechnique, Enum, Palette, Slider
 
 import math
 import random
@@ -17,11 +17,13 @@ class WaveSeaTechnique(BaseTechnique):
     kind = "background"
     palette = Palette()
     weather = Enum([('calm', 'Calm'), ('choppy', 'Choppy'), ('storm', 'Storm')], default='calm')
+    phase = Slider(0, 1, default=0, step=0.01, loop=True)
 
     def run(self, canvas):
         s = int(canvas.size)
         seed = int(canvas.seed)
         rng = random.Random(seed)
+        phase = float(self.phase)
 
         n_sources = {"calm": 3, "choppy": 6, "storm": 10}.get(str(self.weather), 3)
         wl_min, wl_max = {
@@ -35,7 +37,7 @@ class WaveSeaTechnique(BaseTechnique):
             cx = rng.uniform(-s * 0.3, s * 1.3)
             cy = rng.uniform(-s * 0.3, s * 1.3)
             wl = rng.uniform(wl_min, wl_max)
-            ph = rng.random()
+            ph = rng.random() + phase
             sources.append((cx, cy, wl, ph))
 
         wf = art_kit.wave_field(sources)

@@ -13,7 +13,7 @@ class HueShiftTechnique(BaseTechnique):
     description = 'Rotate every pixel\'s hue in HSV space. Quick way to remap an image off the canvas palette into a new color family without re-running the background technique.'
     kind = "filter"
 
-    degrees = Slider(0, 360, default=60, step=5)
+    degrees = Slider(0, 360, default=60, step=1, loop=True)
 
     def run(self, canvas):
         shift = self.degrees / 360.0

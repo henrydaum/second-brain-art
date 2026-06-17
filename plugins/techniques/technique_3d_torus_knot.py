@@ -16,12 +16,14 @@ class TorusKnot3DTechnique(BaseTechnique):
     p = Slider(2, 5, default=2, step=1)
     q = Slider(2, 7, default=3, step=1)
     thickness = Slider(0.04, 0.18, default=0.09, step=0.005)
+    roll = Slider(0, 1, default=0, step=0.01, loop=True)
 
     def run(self, canvas):
         img = canvas.new_layer()
         p = int(round(float(self.p)))
         q = int(round(float(self.q)))
         thickness = float(self.thickness)
+        roll = math.tau * float(self.roll)
 
         R = 1.0
         r = 0.42
@@ -29,12 +31,14 @@ class TorusKnot3DTechnique(BaseTechnique):
         sides = 7
 
         def curve(t):
+            t += roll
             ct, st = math.cos(p * t), math.sin(p * t)
             cq, sq = math.cos(q * t), math.sin(q * t)
             rad = R + r * cq
             return (rad * ct, rad * st, r * sq)
 
         def tangent(t):
+            t += roll
             ct, st = math.cos(p * t), math.sin(p * t)
             cq, sq = math.cos(q * t), math.sin(q * t)
             rad = R + r * cq

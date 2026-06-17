@@ -16,7 +16,7 @@ class ChromaticAberrationTechnique(BaseTechnique):
 
     strength = Slider(0, 30, default=6, step=1)
     radial   = Bool(default=True)
-    angle    = Slider(0, 360, default=0, step=5)
+    angle    = Slider(0, 360, default=0, step=1, loop=True)
 
     def run(self, canvas):
         amt = float(self.strength)

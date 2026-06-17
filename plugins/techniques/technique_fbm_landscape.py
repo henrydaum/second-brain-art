@@ -1,5 +1,6 @@
-from plugins.BaseTechnique import BaseTechnique, Enum, Palette
+from plugins.BaseTechnique import BaseTechnique, Enum, Palette, Slider
 
+import math
 import numpy as np
 from PIL import Image
 
@@ -8,10 +9,10 @@ try:
 except NameError:
     art_kit = None
 
-def _fbm_grid(seed, grid_size, freq, octaves):
+def _fbm_grid(seed, grid_size, freq, octaves, ox=0.0, oy=0.0):
     """Vectorized fbm field on a `grid_size x grid_size` lattice."""
     yy, xx = np.mgrid[0:grid_size, 0:grid_size].astype(np.float32)
-    field = art_kit.fbm_grid(seed, xx * freq, yy * freq, octaves=octaves)
+    field = art_kit.fbm_grid(seed, (xx + ox) * freq, (yy + oy) * freq, octaves=octaves)
     return field.astype(np.float32)
 
 
@@ -21,11 +22,13 @@ class FbmLandscapeTechnique(BaseTechnique):
     kind = "background"
     palette = Palette()
     regime = Enum([('clouds', 'Clouds'), ('terrain', 'Terrain'), ('magma', 'Magma'), ('nebula', 'Nebula'), ('ridges', 'Ridged Turbulence')], default='nebula')
+    phase = Slider(0, 1, default=0, step=0.01, loop=True)
 
     def run(self, canvas):
         s = int(canvas.size)
         seed = int(canvas.seed)
         self.regime = str(self.regime)
+        ox, oy = math.cos(math.tau * float(self.phase)) * 32.0, math.sin(math.tau * float(self.phase)) * 32.0
 
         # Each regime: (grid_size, frequency, octaves, gamma, t_lo, t_hi, special).
         # Grid sampled in pure-Python fbm and BICUBIC-upscaled to canvas. 160 is the
@@ -40,7 +43,7 @@ class FbmLandscapeTechnique(BaseTechnique):
         }
         grid_size, freq, octaves, gamma, t_lo, t_hi, special = cfg.get(self.regime, cfg["nebula"])
 
-        base = _fbm_grid(seed, grid_size, freq, octaves)
+        base = _fbm_grid(seed, grid_size, freq, octaves, ox, oy)
         if special == "ridged":
             base = 1.0 - np.abs(base - 0.5) * 2.0  # ridges along the half-value contour
         base = base - float(base.min())
@@ -56,7 +59,7 @@ class FbmLandscapeTechnique(BaseTechnique):
 
         # Optional nebula color modulation: a second slow fbm tints palette ramp.
         if special == "nebula":
-            warp = _fbm_grid(seed ^ 0x9E3779B9, grid_size, freq * 0.45, 3)
+            warp = _fbm_grid(seed ^ 0x9E3779B9, grid_size, freq * 0.45, 3, -oy, ox)
             warp = warp - float(warp.min())
             warp = warp / (float(warp.max()) or 1.0)
             # Pull t toward (lo) where warp is low and (hi) where warp is high.

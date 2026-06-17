@@ -16,7 +16,7 @@ class ColorFieldTechnique(BaseTechnique):
     mode = Enum([("solid", "Solid"), ("linear", "Linear Gradient"), ("radial", "Radial Gradient")], default="linear")
     # Order follows the palette swatch strip so buttons line up with swatches.
     tone = Enum([("primary", "Primary"), ("secondary", "Secondary"), ("tertiary", "Tertiary"), ("accent", "Accent"), ("background", "Background")], default="background")
-    angle = Slider(0, 360, default=35, step=5)
+    angle = Slider(0, 360, default=35, step=1, loop=True)
 
     def run(self, canvas):
         s = canvas.size

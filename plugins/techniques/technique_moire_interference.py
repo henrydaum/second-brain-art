@@ -1,4 +1,4 @@
-from plugins.BaseTechnique import BaseTechnique, Enum, Palette
+from plugins.BaseTechnique import BaseTechnique, Enum, Palette, Slider
 
 import math
 import numpy as np
@@ -16,11 +16,13 @@ class MoireInterferenceTechnique(BaseTechnique):
     kind = "background"
     palette = Palette()
     pattern = Enum([('beats', 'Parallel Beats'), ('crosshatch', 'Crosshatch'), ('rosette', 'Radial Rosette'), ('turbulent', 'Turbulent')], default='beats')
+    phase = Slider(0, 1, default=0, step=0.01, loop=True)
 
     def run(self, canvas):
         s = int(canvas.size)
         seed = int(canvas.seed)
         self.pattern = str(self.pattern)
+        phase = float(self.phase)
         rng = np.random.default_rng(seed)
 
         # Sample a centered W×H window of the long-edge square so the wave
@@ -48,27 +50,27 @@ class MoireInterferenceTechnique(BaseTechnique):
                 theta = base_theta + dt
                 k = 2 * math.pi / wl
                 phi = rng.uniform(0, 1)
-                field += np.sin(k * (nx * math.cos(theta) + ny * math.sin(theta)) + phi * 2 * math.pi)
+                field += np.sin(k * (nx * math.cos(theta) + ny * math.sin(theta)) + (phi + phase) * 2 * math.pi)
                 n_waves += 1
         elif self.pattern == "crosshatch":
             for dt in (0.0, math.pi / 2.0, math.pi / 4.0, 3 * math.pi / 4.0):
                 wl = float(rng.uniform(0.10, 0.18))
                 k = 2 * math.pi / wl
                 phi = float(rng.uniform(0, 1))
-                field += np.sin(k * (nx * math.cos(dt) + ny * math.sin(dt)) + phi * 2 * math.pi)
+                field += np.sin(k * (nx * math.cos(dt) + ny * math.sin(dt)) + (phi + phase) * 2 * math.pi)
                 n_waves += 1
         elif self.pattern == "rosette":
             # One radial wave + three plane waves.
             r = np.sqrt(nx * nx + ny * ny)
             wl_r = 0.10
-            field += np.sin(2 * math.pi * (r / wl_r))
+            field += np.sin(2 * math.pi * (r / wl_r + phase))
             n_waves += 1
             for _ in range(3):
                 theta = float(rng.uniform(0, math.pi))
                 wl = float(rng.uniform(0.12, 0.22))
                 k = 2 * math.pi / wl
                 phi = float(rng.uniform(0, 1))
-                field += np.sin(k * (nx * math.cos(theta) + ny * math.sin(theta)) + phi * 2 * math.pi)
+                field += np.sin(k * (nx * math.cos(theta) + ny * math.sin(theta)) + (phi + phase) * 2 * math.pi)
                 n_waves += 1
         else:  # turbulent
             for _ in range(8):
@@ -76,7 +78,7 @@ class MoireInterferenceTechnique(BaseTechnique):
                 wl = float(rng.uniform(0.06, 0.30))
                 k = 2 * math.pi / wl
                 phi = float(rng.uniform(0, 1))
-                field += np.sin(k * (nx * math.cos(theta) + ny * math.sin(theta)) + phi * 2 * math.pi)
+                field += np.sin(k * (nx * math.cos(theta) + ny * math.sin(theta)) + (phi + phase) * 2 * math.pi)
                 n_waves += 1
 
         field /= max(1, n_waves)

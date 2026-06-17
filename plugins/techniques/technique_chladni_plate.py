@@ -17,6 +17,7 @@ class ChladniPlateTechnique(BaseTechnique):
     palette = Palette()
     mode_n  = Slider(1, 12, default=4, step=1)
     mode_m  = Slider(1, 12, default=7, step=1)
+    phase   = Slider(0, 1, default=0, step=0.01, loop=True)
 
     def run(self, canvas):
         s = int(canvas.size)
@@ -27,10 +28,11 @@ class ChladniPlateTechnique(BaseTechnique):
         lin = np.linspace(0.0, 1.0, s, dtype=np.float32)
         x, y = np.meshgrid(lin, lin)
         pi = np.pi
+        ph = pi * 2.0 * float(self.phase)
 
         def eigenmode(p, q):
-            return (np.cos(p * pi * x) * np.cos(q * pi * y)
-                    - np.cos(q * pi * x) * np.cos(p * pi * y))
+            return (np.cos(p * pi * x + ph) * np.cos(q * pi * y)
+                    - np.cos(q * pi * x - ph) * np.cos(p * pi * y))
 
         # Superpose several harmonics of the chosen mode so the nodal web is
         # far more intricate than a single eigenmode's lattice.

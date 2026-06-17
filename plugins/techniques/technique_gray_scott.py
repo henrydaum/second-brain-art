@@ -1,5 +1,6 @@
-from plugins.BaseTechnique import BaseTechnique, Enum, Palette
+from plugins.BaseTechnique import BaseTechnique, Enum, Palette, Slider
 
+import math
 import numpy as np
 from PIL import Image
 
@@ -41,11 +42,13 @@ class GrayScottTechnique(BaseTechnique):
     kind = "background"
     palette = Palette()
     regime = Enum([('spots', 'Spots'), ('maze', 'Maze'), ('worms', 'Worms'), ('coral', 'Coral'), ('uskate', 'U-skate (solitons)')], default='maze')
+    time = Slider(0, 1, default=0.5, step=0.01, loop=True)
 
     def run(self, canvas):
         s = int(canvas.size)
         seed = int(canvas.seed)
         f, k, n_steps = _PRESETS.get(str(self.regime), _PRESETS["coral"])
+        n_steps = int(round(n_steps * math.sin(math.pi * float(self.time))))
         rng = np.random.default_rng(seed)
 
         N = 384

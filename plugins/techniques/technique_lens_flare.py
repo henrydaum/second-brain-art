@@ -19,6 +19,7 @@ class LensFlareTechnique(BaseTechnique):
     sx         = Slider(0.0, 1.0, default=0.30, step=0.05)
     sy         = Slider(0.0, 1.0, default=0.28, step=0.05)
     source     = Pan(x='sx', y='sy')
+    orbit      = Slider(0, 1, default=0, step=0.01, loop=True)
     ghosts     = Slider(0, 8, default=5, step=1)
 
     def run(self, canvas):
@@ -28,7 +29,9 @@ class LensFlareTechnique(BaseTechnique):
         s = max(W, H)  # reference length for distance falloffs
 
         yy, xx = np.mgrid[0:H, 0:W].astype(np.float32)
-        px, py = float(self.sx) * W, float(self.sy) * H
+        a = float(self.orbit) * np.pi * 2.0
+        px = (float(self.sx) + 0.12 * np.cos(a)) * W
+        py = (float(self.sy) + 0.12 * np.sin(a)) * H
         cx, cy = W / 2.0, H / 2.0
 
         def tint(t, value=1.0):

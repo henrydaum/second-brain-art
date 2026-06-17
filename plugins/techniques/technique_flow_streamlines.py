@@ -1,4 +1,4 @@
-from plugins.BaseTechnique import BaseTechnique, Enum, Palette
+from plugins.BaseTechnique import BaseTechnique, Enum, Palette, Slider
 
 import math
 import random
@@ -16,11 +16,13 @@ class FlowStreamlinesTechnique(BaseTechnique):
     kind = "background"
     palette = Palette()
     swirl = Enum([('loose', 'Loose'), ('tight', 'Tight'), ('turbulent', 'Turbulent')], default='loose')
+    phase = Slider(0, 1, default=0, step=0.01, loop=True)
 
     def run(self, canvas):
         s = int(canvas.size)
         seed = int(canvas.seed)
         rng = random.Random(seed)
+        ox, oy = math.cos(math.tau * float(self.phase)) * s * 0.35, math.sin(math.tau * float(self.phase)) * s * 0.35
 
         scale = {"loose": 0.0035, "tight": 0.008, "turbulent": 0.013}.get(str(self.swirl), 0.0035)
         octaves = {"loose": 3, "tight": 4, "turbulent": 6}.get(str(self.swirl), 3)
@@ -40,7 +42,7 @@ class FlowStreamlinesTechnique(BaseTechnique):
             ramp = 0.15 + 0.75 * rng.random()
             color = art_kit.palette_color(ramp)
             for si in range(n_steps):
-                ang = field(x, y)
+                ang = field(x + ox, y + oy)
                 nx = x + math.cos(ang) * step_len
                 ny = y + math.sin(ang) * step_len
                 if nx < -s * 0.1 or nx > s * 1.1 or ny < -s * 0.1 or ny > s * 1.1:

@@ -126,7 +126,7 @@ def _run_signature_error(run: ast.FunctionDef) -> str | None:
 
 
 _DESCRIPTOR_KWARGS = {
-    "Slider": {"default", "step", "label"},
+    "Slider": {"default", "step", "label", "loop"},
     "Bool": {"default", "label"},
     "Enum": {"default", "label"},
     "Pan": {"x", "y", "label", "step"},

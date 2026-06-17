@@ -15,7 +15,7 @@ class PolarCoordinatesTechnique(BaseTechnique):
     kind = "filter"
 
     mode     = Enum([('to_polar', 'To Polar'), ('from_polar', 'From Polar')], default='to_polar')
-    rotation = Slider(0, 360, default=0, step=5)
+    rotation = Slider(0, 360, default=0, step=1, loop=True)
 
     def run(self, canvas):
         arr = canvas.image_array(mode="RGB", dtype="float")

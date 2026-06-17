@@ -1,4 +1,4 @@
-from plugins.BaseTechnique import BaseTechnique, Enum, Palette
+from plugins.BaseTechnique import BaseTechnique, Enum, Palette, Slider
 
 import math
 import numpy as np
@@ -16,10 +16,12 @@ class SolarDiscTechnique(BaseTechnique):
     kind = "background"
     palette = Palette()
     mood = Enum([('calm', 'Calm'), ('fierce', 'Fierce'), ('eclipse', 'Eclipse')], default='calm')
+    phase = Slider(0, 1, default=0, step=0.01, loop=True)
 
     def run(self, canvas):
         s = int(canvas.size)
         seed = int(canvas.seed)
+        phase = math.tau * float(self.phase)
         contrast = {"calm": 0.45, "fierce": 0.95, "eclipse": 1.25}.get(str(self.mood), 0.45)
         core = {"calm": 0.55, "fierce": 0.45, "eclipse": 0.28}.get(str(self.mood), 0.55)
 
@@ -39,7 +41,7 @@ class SolarDiscTechnique(BaseTechnique):
 
         ANG = 720
         ang_lut = np.array(
-            [art_kit.fbm(seed, math.cos(a) * 2.5, math.sin(a) * 2.5, octaves=5)
+            [art_kit.fbm(seed, math.cos(a + phase) * 2.5, math.sin(a + phase) * 2.5, octaves=5)
              for a in np.linspace(-math.pi, math.pi, ANG, endpoint=False)],
             dtype=np.float32,
         )

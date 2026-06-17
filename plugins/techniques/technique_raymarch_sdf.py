@@ -1,4 +1,4 @@
-from plugins.BaseTechnique import BaseTechnique, Enum, Palette
+from plugins.BaseTechnique import BaseTechnique, Enum, Palette, Slider
 
 import math
 import numpy as np
@@ -47,6 +47,7 @@ class RaymarchSdfTechnique(BaseTechnique):
     kind = "background"
     palette = Palette()
     scene = Enum([('spheres', 'Three Spheres'), ('torus', 'Torus'), ('shapes', 'Mixed Shapes')], default='torus')
+    phase = Slider(0, 1, default=0, step=0.01, loop=True)
 
     def run(self, canvas):
         W, H = int(canvas.width), int(canvas.height)
@@ -64,6 +65,8 @@ class RaymarchSdfTechnique(BaseTechnique):
         ys, xs = np.mgrid[0:R_h, 0:R_w].astype(np.float32)
         nx = (xs - R_w / 2.0) / (R / 2.0)
         ny = (ys - R_h / 2.0) / (R / 2.0)
+        ca, sa = math.cos(math.tau * float(self.phase)), math.sin(math.tau * float(self.phase))
+        nx, ny = nx * ca - ny * sa, nx * sa + ny * ca
 
         sdf_fns = {"spheres": _sdf_spheres, "torus": _sdf_torus, "shapes": _sdf_shapes}
         sdf = sdf_fns.get(self.scene, _sdf_spheres)
