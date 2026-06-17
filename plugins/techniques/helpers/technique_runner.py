@@ -129,7 +129,7 @@ def run_technique(
     killed_for_memory = {"flag": False, "peak": 0}
     returncode = 1
     try:
-        if worker_pool is not None and getattr(worker_pool, "enabled", True):
+        if worker_pool is not None and getattr(worker_pool, "loaded", False):
             try:
                 pooled = worker_pool.run_job(
                     job_path=job_path, timeout_s=timeout_s, memory_mb=memory_mb,

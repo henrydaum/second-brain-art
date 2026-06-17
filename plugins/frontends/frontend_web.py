@@ -8,6 +8,7 @@ import mimetypes
 import hashlib
 import html as _html
 import io
+import os
 import random
 import re
 import secrets
@@ -111,7 +112,6 @@ class WebFrontend(BaseFrontend):
         ("Web Max Per-IP Connections", "web_max_ip_connections", "Maximum simultaneous in-flight HTTP requests from a single IP.", DEFAULT_MAX_IP_CONNECTIONS, {"type": "integer"}),
         ("App Base URL", "app_base_url", "Public origin of the web demo, used to build share links.", "http://127.0.0.1:8765", {"type": "text"}),
         ("Video Frame Timeout", "video_frame_timeout_s", "Per-frame render timeout (seconds) when exporting a video.", 60, {"type": "integer"}),
-        ("Video Render Workers", "video_render_workers", "Maximum video frames to render at once.", 2, {"type": "integer"}),
         # The two per-user "advanced settings", stored in users.config.
         ("Technique Authoring", "technique_authoring_enabled", "Allow this user's assistant to create/edit/delete custom techniques.", False, {"type": "bool", "scope": "user"}),
         ("Community Techniques", "community_techniques_enabled", "Show community-authored (non-built-in) techniques in search and the picker.", False, {"type": "bool", "scope": "user"}),
@@ -807,10 +807,8 @@ class WebFrontend(BaseFrontend):
         seed = getattr(cs, "render_seed", None)
         worker_pool = (getattr(self.runtime, "services", None) or {}).get("technique_worker_pool")
         frame_timeout = _int(self.config.get("video_frame_timeout_s"), 60)
-        render_workers = max(1, min(frame_count, _int(self.config.get("video_render_workers"), 2), 8))
-        render_worker_pool = worker_pool
-        if render_workers > int(getattr(worker_pool, "active_limit", render_workers) or 0):
-            render_worker_pool = None
+        render_worker_pool = worker_pool if worker_pool is not None and getattr(worker_pool, "loaded", False) else None
+        render_workers = _video_worker_count(frame_count, render_worker_pool)
         base_layers = [dict(layer, controls=dict(layer.get("controls") or {})) for layer in cs.canvas.layers]
         for item in controls or []:
             if not isinstance(item, dict):
@@ -1983,3 +1981,9 @@ def _int(value, default: int) -> int:
         return int(value)
     except Exception:
         return default
+
+
+def _video_worker_count(frame_count: int, worker_pool=None) -> int:
+    if worker_pool is not None:
+        return max(1, min(int(frame_count), int(getattr(worker_pool, "active_limit", 1) or 1)))
+    return max(1, min(int(frame_count), max(1, (os.cpu_count() or 1) - 1)))

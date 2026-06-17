@@ -38,31 +38,32 @@ class TechniqueWorkerResult:
     stderr: bytes
     memory_killed: bool = False
     peak_bytes: int = 0
+    duration_s: float = 0.0
 
 
 class TechniqueWorkerPoolService(BaseService):
     model_name = "technique_worker_pool"
     shared = True
     config_settings = [
-        ("Technique Worker Pool Enabled", "technique_worker_pool_enabled", "Use prewarmed disposable subprocesses for canvas techniques.", True, {"type": "bool"}),
-        ("Technique Worker Min Idle", "technique_worker_min_idle", "Warm sandbox workers kept ready.", 1, {"type": "integer"}),
-        ("Technique Worker Max Workers", "technique_worker_max_workers", "Maximum warm/active technique sandbox processes.", 2, {"type": "integer"}),
+        ("Technique Worker Memory Budget (MB)", "technique_worker_memory_budget_mb", "RAM budget for active technique sandbox processes.", 4096, {"type": "integer"}),
         ("Technique Worker Queue Timeout (s)", "technique_worker_queue_timeout_s", "Seconds a render waits for a technique worker before failing busy.", 10, {"type": "integer"}),
     ]
 
     def __init__(self, config: dict):
         super().__init__()
-        self.enabled = bool(config.get("technique_worker_pool_enabled", True))
-        self.min_idle = max(0, int(config.get("technique_worker_min_idle", 1)))
-        self.max_workers = max(1, int(config.get("technique_worker_max_workers", 2)))
-        self.min_idle = min(self.min_idle, self.max_workers - 1) if self.max_workers > 1 else 0
+        self.cpu_limit = max(1, (os.cpu_count() or 1) - 1)
+        self.max_workers = self.cpu_limit
+        self.min_idle = 1 if self.max_workers > 1 else 0
         self.queue_timeout_s = max(0.1, float(config.get("technique_worker_queue_timeout_s", 10)))
-        self.active_limit = max(1, self.max_workers - self.min_idle)
+        self.memory_budget_mb = max(128.0, float(config.get("technique_worker_memory_budget_mb", 4096)))
+        self.active_limit = self.cpu_limit
         self._idle: queue.Queue[subprocess.Popen] = queue.Queue()
-        self._active_sem = threading.BoundedSemaphore(self.active_limit)
         self._lock = threading.Lock()
+        self._gate = threading.Condition(self._lock)
         self._all: set[subprocess.Popen] = set()
         self._active = 0
+        self._reserved_mb = 0.0
+        self._estimate_mb = 0.0
         self._warming = 0
         self._stopping = False
         self._entry, self._env, self._cwd = self._worker_context()
@@ -70,8 +71,7 @@ class TechniqueWorkerPoolService(BaseService):
     def _load(self) -> bool:
         self._stopping = False
         self._loaded = True
-        if self.enabled:
-            self._ensure_idle()
+        self._ensure_idle()
         return True
 
     def unload(self):
@@ -88,29 +88,67 @@ class TechniqueWorkerPoolService(BaseService):
         self._loaded = False
 
     def run_job(self, *, job_path: str, timeout_s: float, memory_mb: int) -> TechniqueWorkerResult:
-        if not self.enabled:
-            raise TechniqueWorkerBusy("technique worker pool is disabled")
         if not self.loaded:
-            self.load()
+            raise TechniqueWorkerBusy("technique worker pool is not loaded")
         deadline = time.monotonic() + self.queue_timeout_s
-        sem_timeout = max(0.0, deadline - time.monotonic())
-        if not self._active_sem.acquire(timeout=sem_timeout):
-            raise TechniqueWorkerBusy("renderer busy; retry shortly")
+        reserve_mb = self._claim_slot(memory_mb, deadline)
         proc = None
         try:
-            with self._lock:
-                self._active += 1
             proc = self._take_idle(deadline)
             self._ensure_idle()
-            return self._run_checked_out(proc, job_path, timeout_s, memory_mb)
+            result = self._run_checked_out(proc, job_path, timeout_s, memory_mb)
+            self._observe_job(memory_mb, result.peak_bytes, result.duration_s)
+            return result
         finally:
             if proc is not None:
                 self._forget(proc)
-            with self._lock:
-                self._active = max(0, self._active - 1)
-            try: self._active_sem.release()
-            except ValueError: pass
+            self._release_slot(reserve_mb)
             self._ensure_idle()
+
+    def _claim_slot(self, memory_mb: int, deadline: float) -> float:
+        reserve_mb = self._reserve_mb(memory_mb)
+        with self._gate:
+            while not self._can_start(reserve_mb):
+                timeout = max(0.0, deadline - time.monotonic())
+                if timeout <= 0 or not self._gate.wait(timeout):
+                    raise TechniqueWorkerBusy("renderer busy; retry shortly")
+            self._active += 1
+            self._reserved_mb += reserve_mb
+            return reserve_mb
+
+    def _release_slot(self, reserve_mb: float) -> None:
+        with self._gate:
+            self._active = max(0, self._active - 1)
+            self._reserved_mb = max(0.0, self._reserved_mb - reserve_mb)
+            self._gate.notify_all()
+
+    def _can_start(self, reserve_mb: float) -> bool:
+        if self._active >= self.cpu_limit:
+            return False
+        budget = self._effective_budget_mb()
+        return self._active == 0 or self._reserved_mb + reserve_mb <= budget
+
+    def _reserve_mb(self, memory_mb: int) -> float:
+        base = self._estimate_mb or max(64.0, float(memory_mb))
+        return min(max(64.0, base * 1.25), self._effective_budget_mb())
+
+    def _observe_job(self, memory_mb: int, peak_bytes: int, duration_s: float) -> None:
+        if peak_bytes <= 0:
+            return
+        peak_mb = peak_bytes / (1024 * 1024)
+        with self._lock:
+            floor = max(64.0, min(float(memory_mb), peak_mb))
+            self._estimate_mb = max((self._estimate_mb or floor) * 0.8 + peak_mb * 0.2, floor)
+        logger.debug("technique worker job peak=%.0fMB estimate=%.0fMB duration=%.2fs", peak_mb, self._estimate_mb, duration_s)
+
+    def _effective_budget_mb(self) -> float:
+        budget = self.memory_budget_mb
+        if psutil is not None:
+            try:
+                budget = min(budget, psutil.virtual_memory().available / (1024 * 1024))
+            except Exception:
+                pass
+        return max(64.0, budget * 0.85)
 
     def _take_idle(self, deadline: float):
         self._ensure_idle()
@@ -121,12 +159,12 @@ class TechniqueWorkerPoolService(BaseService):
             raise TechniqueWorkerBusy("renderer busy; no warm technique worker became ready")
 
     def _ensure_idle(self):
-        if not self.enabled or not self.loaded:
+        if not self.loaded:
             return
         with self._lock:
             while (
                 not self._stopping
-                and self._idle.qsize() + self._warming < self.min_idle
+                and self._idle.qsize() + self._warming < self.min_idle + self._active
                 and self._active + self._idle.qsize() + self._warming < self.max_workers
             ):
                 self._warming += 1
@@ -163,6 +201,7 @@ class TechniqueWorkerPoolService(BaseService):
         stop = threading.Event()
         mem = {"killed": False, "peak": 0}
         wd = self._watch_memory(proc, max(64, int(memory_mb)) * 1024 * 1024, stop, mem)
+        t0 = time.time()
         try:
             try:
                 stdout, stderr = proc.communicate(input=(job_path + "\n").encode("utf-8"), timeout=timeout_s)
@@ -173,7 +212,7 @@ class TechniqueWorkerPoolService(BaseService):
             stop.set()
             if wd is not None:
                 wd.join(timeout=1.0)
-        return TechniqueWorkerResult(proc.returncode, stdout or b"", stderr or b"", mem["killed"], mem["peak"])
+        return TechniqueWorkerResult(proc.returncode, stdout or b"", stderr or b"", mem["killed"], mem["peak"], time.time() - t0)
 
     def _watch_memory(self, proc, cap: int, stop: threading.Event, mem: dict):
         if psutil is None:
