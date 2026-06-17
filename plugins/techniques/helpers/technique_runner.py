@@ -61,8 +61,11 @@ def run_technique(
     memory_mb: int = DEFAULT_MEMORY_MB,
     png_compress_level: int = 1,
     worker_pool=None,
+    cancel_event=None,
 ) -> dict:
     """Execute a technique in a sandboxed subprocess. Returns a small status dict."""
+    if cancel_event is not None and cancel_event.is_set():
+        raise TechniqueRunError("render cancelled", diagnostic={"error_type": "Cancelled", "message": "render cancelled"})
     try:
         assert_valid(technique.code)
     except Exception as e:
@@ -132,7 +135,7 @@ def run_technique(
         if worker_pool is not None and getattr(worker_pool, "loaded", False):
             try:
                 pooled = worker_pool.run_job(
-                    job_path=job_path, timeout_s=timeout_s, memory_mb=memory_mb,
+                    job_path=job_path, timeout_s=timeout_s, memory_mb=memory_mb, cancel_event=cancel_event,
                 )
             except TechniqueWorkerBusy as e:
                 raise TechniqueRunError(
@@ -157,31 +160,30 @@ def run_technique(
                 env=env, cwd=str(project_root),
             )
             watchdog_stop = threading.Event()
-            if psutil is not None:
+            if psutil is not None or cancel_event is not None:
                 def _watchdog():
-                    try:
-                        p = psutil.Process(proc.pid)
-                    except psutil.Error:
-                        return
+                    try: p = psutil.Process(proc.pid) if psutil is not None else None
+                    except Exception: return
                     while not watchdog_stop.wait(0.2):
-                        try:
-                            rss = p.memory_info().rss
-                            for child in p.children(recursive=True):
-                                try:
-                                    rss += child.memory_info().rss
-                                except psutil.Error:
-                                    pass
-                        except psutil.Error:
+                        if cancel_event is not None and cancel_event.is_set():
+                            try: proc.kill()
+                            except OSError: pass
                             return
-                        if rss > killed_for_memory["peak"]:
-                            killed_for_memory["peak"] = rss
-                        if rss > mem_cap_bytes:
-                            killed_for_memory["flag"] = True
+                        if p is not None:
                             try:
-                                proc.kill()
-                            except OSError:
-                                pass
-                            return
+                                rss = p.memory_info().rss
+                                for child in p.children(recursive=True):
+                                    try: rss += child.memory_info().rss
+                                    except psutil.Error: pass
+                            except psutil.Error:
+                                return
+                            if rss > killed_for_memory["peak"]:
+                                killed_for_memory["peak"] = rss
+                            if rss > mem_cap_bytes:
+                                killed_for_memory["flag"] = True
+                                try: proc.kill()
+                                except OSError: pass
+                                return
                 wd = threading.Thread(target=_watchdog, name=f"technique-mem-watchdog-{proc.pid}", daemon=True)
                 wd.start()
             else:

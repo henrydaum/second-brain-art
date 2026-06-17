@@ -1,10 +1,11 @@
 import time
+import threading
 
 import pytest
 
 import plugins.services.service_technique_worker_pool as pool_mod
 import plugins.frontends.frontend_web as web_mod
-from plugins.frontends.frontend_web import _video_worker_count
+from plugins.frontends.frontend_web import _VideoFrameError, _missing_video_frames, _render_video_frames, _video_worker_count
 
 
 def _svc(monkeypatch, *, cpu=8, budget=1000):
@@ -64,3 +65,30 @@ def test_video_worker_count_is_pool_or_cpu_derived(monkeypatch):
     monkeypatch.setattr(web_mod.os, "cpu_count", lambda: 10)
     assert _video_worker_count(30, Pool()) == 12
     assert _video_worker_count(30, None) == 9
+
+
+def test_video_missing_frames_are_rejected(tmp_path):
+    good = tmp_path / "frame.png"
+    good.write_bytes(b"ok")
+    assert _missing_video_frames([good, None, tmp_path / "gone.png"]) == [2, 3]
+
+
+def test_video_frame_failure_cancels_unsubmitted_frames(tmp_path):
+    seen = []
+    cancel = threading.Event()
+    frame_paths = [None] * 5
+
+    def render_one(i):
+        seen.append(i)
+        if i == 0:
+            raise RuntimeError("boom")
+        while not cancel.wait(0.01):
+            pass
+        raise RuntimeError("cancelled")
+
+    with pytest.raises(_VideoFrameError):
+        _render_video_frames(5, 2, render_one, cancel, frame_paths, lambda _n: None)
+
+    assert cancel.is_set()
+    assert 0 in seen
+    assert set(seen) <= {0, 1}

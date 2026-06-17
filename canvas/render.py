@@ -199,6 +199,7 @@ def render_canvas(
 	on_event: Callable[[dict], None] | None = None,
 	worker_pool: Any = None,
 	timeout_s: float | None = None,
+	cancel_event: Any = None,
 ) -> RenderResult:
 	"""Render ``cs.canvas``'s chain to a PNG file and return the result.
 
@@ -220,6 +221,8 @@ def render_canvas(
 	canvas = cs.canvas
 	if not canvas.layers:
 		raise ValueError("nothing to render — canvas has no layers")
+	if cancel_event is not None and cancel_event.is_set():
+		raise ValueError("render cancelled")
 
 	folder = folder_for(canvas)
 	folder.mkdir(parents=True, exist_ok=True)
@@ -293,6 +296,8 @@ def render_canvas(
 		last_warning: dict | None = None
 		try:
 			for idx, layer in enumerate(canvas.layers[start_idx:], start=start_idx):
+				if cancel_event is not None and cancel_event.is_set():
+					raise ValueError("render cancelled")
 				slug = layer.get("slug")
 				technique = technique_loader(slug) if slug else None
 				if technique is None:
@@ -313,6 +318,7 @@ def render_canvas(
 					memory_mb=memory_cap_for_dims(int(canvas.width), int(canvas.height)),
 					png_compress_level=PNG_COMPRESS_LEVEL,
 					worker_pool=worker_pool,
+					cancel_event=cancel_event,
 				)
 				# Only the final layer's warning matters for the user-visible result;
 				# overwrite as we go so the last iteration wins.

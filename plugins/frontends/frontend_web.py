@@ -16,7 +16,7 @@ import socket
 import time
 import threading
 import uuid
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from collections import defaultdict, OrderedDict
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -125,6 +125,7 @@ class WebFrontend(BaseFrontend):
         self._events_cv = threading.Condition(self._lock)
         self._stream_counts: dict[str, int] = defaultdict(int)
         self._last_hero: dict[str, str] = {}
+        self._video_cancels: dict[str, threading.Event] = {}
 
     def session_key(self, ctx=None) -> str:
         return f"web:{ctx or 'demo'}"
@@ -490,6 +491,15 @@ class WebFrontend(BaseFrontend):
                 events.append({"type": "status", "content": msg})
         return events
 
+    def cancel_video(self, session_id: str) -> list[dict]:
+        key = self.session_key(session_id)
+        with self._lock:
+            ev = self._video_cancels.get(key)
+        if ev is not None:
+            ev.set()
+            return [{"type": "status", "content": "Cancelling video render..."}]
+        return [{"type": "status", "content": "No video render is running."}]
+
     def canvas_payload(self, session_id: str) -> dict:
         """Return the current canvas (new system), rendering on-demand if needed."""
         key = self.session_key(session_id)
@@ -822,6 +832,13 @@ class WebFrontend(BaseFrontend):
                 return [{"type": "error", "content": "Video failed: invalid staged control"}]
             base_layers[ci]["controls"][name] = item.get("value")
 
+        cancel_event = threading.Event()
+        with self._lock:
+            old_cancel = self._video_cancels.get(key)
+            if old_cancel is not None:
+                old_cancel.set()
+            self._video_cancels[key] = cancel_event
+
         def frame_layers(i: int) -> list[dict]:
             layers = []
             overrides: dict[int, dict] = {}
@@ -839,6 +856,8 @@ class WebFrontend(BaseFrontend):
             return layers
 
         def render_one(i: int) -> tuple[int, Path]:
+            if cancel_event.is_set():
+                raise RuntimeError("video render cancelled")
             frame_canvas = Canvas(
                 width=target_w, height=target_h,
                 palette_id=cs.canvas.palette_id, layers=frame_layers(i),
@@ -850,6 +869,7 @@ class WebFrontend(BaseFrontend):
                 db=None,
                 timeout_s=frame_timeout,
                 worker_pool=render_worker_pool,
+                cancel_event=cancel_event,
             )
             return i, Path(rr.image_path)
 
@@ -867,32 +887,40 @@ class WebFrontend(BaseFrontend):
                     db=None,
                     timeout_s=frame_timeout,
                     worker_pool=render_worker_pool,
+                    cancel_event=cancel_event,
                 )
             except Exception as e:
                 logger.exception("render_video static prefix failed session=%s", key)
+                with self._lock:
+                    if self._video_cancels.get(key) is cancel_event:
+                        self._video_cancels.pop(key, None)
+                if _is_cancelled_error(e):
+                    return [{"type": "error", "content": "Video cancelled."}]
                 return [{"type": "error", "content": f"Video failed while preparing shared layers: {e}"}]
 
         frame_paths: list[Path | None] = [None] * frame_count
-        completed = 0
-        failed_i = 0
         try:
-            with ThreadPoolExecutor(max_workers=render_workers, thread_name_prefix="video-frame") as ex:
-                futures = {ex.submit(render_one, i): i for i in range(frame_count)}
-                for fut in as_completed(futures):
-                    failed_i = futures[fut]
-                    frame_idx, path = fut.result()
-                    frame_paths[frame_idx] = path
-                    completed += 1
-                    self.render_canvas_status(key, {
-                        "status": "video_frame", "frame": completed, "total_frames": frame_count,
-                    })
-        except Exception as e:
+            try:
+                _render_video_frames(frame_count, render_workers, render_one, cancel_event, frame_paths, lambda n: self.render_canvas_status(key, {
+                    "status": "video_frame", "frame": n, "total_frames": frame_count,
+                }))
+            finally:
+                with self._lock:
+                    if self._video_cancels.get(key) is cancel_event:
+                        self._video_cancels.pop(key, None)
+        except _VideoFrameError as e:
             logger.exception("render_video frame failed session=%s", key)
-            return [{"type": "error", "content": f"Video failed on frame {failed_i + 1}/{frame_count}: {e}"}]
+            if _is_cancelled_error(e.__cause__ or e):
+                return [{"type": "error", "content": "Video cancelled."}]
+            return [{"type": "error", "content": f"Video failed on frame {e.frame + 1}/{frame_count}: {e.__cause__ or e}"}]
+
+        missing = _missing_video_frames(frame_paths)
+        if missing:
+            return [{"type": "error", "content": f"Video failed: missing rendered frame(s): {', '.join(map(str, missing[:8]))}"}]
 
         try:
             out_path, download_name = encode_frames(
-                [p for p in frame_paths if p is not None], fps=info["fps"], fmt=info["fmt"], out_dir=_video_export_dir(),
+                frame_paths, fps=info["fps"], fmt=info["fmt"], out_dir=_video_export_dir(),
             )
         except Exception as e:
             logger.exception("video encode failed session=%s", key)
@@ -1576,6 +1604,8 @@ class _Handler(BaseHTTPRequestHandler):
                 return self._json({"ok": True, "events": self.server.frontend.new_chat(sid)})
             if self.path == "/api/cancel":
                 return self._json({"ok": True, "events": self.server.frontend.cancel(sid)})
+            if self.path == "/api/cancel_video":
+                return self._json({"ok": True, "events": self.server.frontend.cancel_video(sid)})
             if self.path == "/api/approval":
                 return self._json({"ok": True, "events": self.server.frontend.approve(sid, bool(body.get("value")))})
             if self.path == "/api/remix":
@@ -1987,3 +2017,49 @@ def _video_worker_count(frame_count: int, worker_pool=None) -> int:
     if worker_pool is not None:
         return max(1, min(int(frame_count), int(getattr(worker_pool, "active_limit", 1) or 1)))
     return max(1, min(int(frame_count), max(1, (os.cpu_count() or 1) - 1)))
+
+
+class _VideoFrameError(RuntimeError):
+    def __init__(self, frame: int, error: BaseException):
+        super().__init__(str(error))
+        self.frame = frame
+        self.__cause__ = error
+
+
+def _render_video_frames(frame_count: int, render_workers: int, render_one, cancel_event: threading.Event, frame_paths: list, on_frame) -> None:
+    ex = ThreadPoolExecutor(max_workers=render_workers, thread_name_prefix="video-frame")
+    futures = {}
+    next_i = completed = 0
+    try:
+        while next_i < min(frame_count, render_workers):
+            futures[ex.submit(render_one, next_i)] = next_i
+            next_i += 1
+        while futures:
+            done, _ = wait(futures, return_when=FIRST_COMPLETED)
+            for fut in done:
+                frame_i = futures.pop(fut)
+                exc = fut.exception()
+                if exc is not None:
+                    cancel_event.set()
+                    for pending in futures:
+                        pending.cancel()
+                    raise _VideoFrameError(frame_i, exc) from exc
+                idx, path = fut.result()
+                frame_paths[idx] = path
+                completed += 1
+                on_frame(completed)
+                if next_i < frame_count and not cancel_event.is_set():
+                    futures[ex.submit(render_one, next_i)] = next_i
+                    next_i += 1
+    except Exception:
+        ex.shutdown(wait=False, cancel_futures=True)
+        raise
+    ex.shutdown(wait=True)
+
+
+def _missing_video_frames(frame_paths: list[Path | None]) -> list[int]:
+    return [i + 1 for i, p in enumerate(frame_paths) if p is None or not p.is_file()]
+
+
+def _is_cancelled_error(error: BaseException) -> bool:
+    return "cancelled" in str(error).lower() or "canceled" in str(error).lower()

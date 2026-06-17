@@ -51,6 +51,19 @@ def test_web_settings_persist_per_browser_guest_and_apply_scope(tmp_path):
     frontend.unbind()
 
 
+def test_cancel_video_sets_active_session_event(tmp_path):
+    _db, _runtime, frontend = _frontend(tmp_path)
+    key = frontend.session_key("browser")
+    ev = threading.Event()
+    frontend._video_cancels[key] = ev
+
+    events = frontend.cancel_video("browser")
+
+    assert ev.is_set()
+    assert events == [{"type": "status", "content": "Cancelling video render..."}]
+    frontend.unbind()
+
+
 def test_account_page_redirects_to_root_and_file_is_gone(tmp_path):
     _db, _runtime, frontend = _frontend(tmp_path)
     server = _Server(("127.0.0.1", 0), _Handler, frontend, max_global=8, max_per_ip=8)

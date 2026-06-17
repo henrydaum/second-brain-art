@@ -181,6 +181,8 @@ article.credit-error { display: grid; gap: 7px; color: var(--muted); background:
 .video-popup .vp-size-btn { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; height: 36px; padding: 0 12px; border: 1px solid var(--line); background: #10141e; color: var(--text); cursor: pointer; transition: border-color 160ms ease, color 160ms ease; }
 .video-popup .vp-size-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
 .video-popup .vp-size-btn:disabled { opacity: .7; cursor: progress; }
+.video-popup .vp-size-btn.cancel { border-color: var(--accent-2); color: var(--accent-2); }
+.video-popup .vp-size-btn.cancel:hover { background: var(--accent-2); color: #08090d; }
 .video-popup .vp-size-btn .vp-size-label { font-weight: 700; letter-spacing: .01em; }
 .video-popup .vp-size-btn .vp-size-dims { font-size: 11px; color: var(--muted); font-family: ui-monospace, "Cascadia Code", "Consolas", monospace; }
 .video-popup .vp-size-btn:hover:not(:disabled) .vp-size-dims { color: var(--accent); }

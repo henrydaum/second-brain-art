@@ -53,6 +53,8 @@ const pendingControls = new Map();
 const videoSliders = new Set();
 let videoFpsValue = 24;
 let videoSecondsValue = 3;
+let videoRendering = false;
+let videoCanceling = false;
 let typingEl = null;
 const TOOL_LABELS = {
   search_techniques: "Searching techniques",
@@ -1077,6 +1079,14 @@ function setVideoPopupOpen(open) {
   }
 }
 async function runVideoTier(btn) {
+  if (videoRendering && btn.classList.contains("loading")) {
+    if (videoCanceling) return;
+    videoCanceling = true;
+    const labelEl = btn.querySelector(".vp-size-label");
+    if (labelEl) labelEl.textContent = "Cancelling…";
+    try { await post("/api/cancel_video"); } catch {}
+    return;
+  }
   if (btn.disabled) return;
   const popup = controlsPanel.querySelector("#videoPopup");
   const specs = selectedVideoSpecs();
@@ -1088,9 +1098,11 @@ async function runVideoTier(btn) {
   const orig = labelEl ? labelEl.textContent : "";
   videoFpsValue = fps;
   videoSecondsValue = seconds;
-  popup?.querySelectorAll(".vp-size-btn").forEach(b => b.disabled = true);
-  btn.classList.add("loading");
-  if (labelEl) labelEl.textContent = "Rendering…";
+  videoRendering = true;
+  videoCanceling = false;
+  popup?.querySelectorAll(".vp-size-btn").forEach(b => b.disabled = b !== btn);
+  btn.classList.add("loading", "cancel");
+  if (labelEl) labelEl.textContent = "Cancel";
   loaderTicketStart();
   try {
     const r = await post("/api/render_video", {specs, controls: [...pendingControls.values()], fps, seconds, scale});
@@ -1109,8 +1121,10 @@ async function runVideoTier(btn) {
   } catch (err) {
     add("error", err.message);
   } finally {
+    videoRendering = false;
+    videoCanceling = false;
     popup?.querySelectorAll(".vp-size-btn").forEach(b => b.disabled = false);
-    btn.classList.remove("loading");
+    btn.classList.remove("loading", "cancel");
     if (labelEl) labelEl.textContent = orig;
     loaderTicketEnd();
     renderMeter.hidden = true;

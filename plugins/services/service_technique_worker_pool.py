@@ -87,16 +87,16 @@ class TechniqueWorkerPoolService(BaseService):
             self._all.clear()
         self._loaded = False
 
-    def run_job(self, *, job_path: str, timeout_s: float, memory_mb: int) -> TechniqueWorkerResult:
+    def run_job(self, *, job_path: str, timeout_s: float, memory_mb: int, cancel_event=None) -> TechniqueWorkerResult:
         if not self.loaded:
             raise TechniqueWorkerBusy("technique worker pool is not loaded")
         deadline = time.monotonic() + self.queue_timeout_s
-        reserve_mb = self._claim_slot(memory_mb, deadline)
+        reserve_mb = self._claim_slot(memory_mb, deadline, cancel_event)
         proc = None
         try:
-            proc = self._take_idle(deadline)
+            proc = self._take_idle(deadline, cancel_event)
             self._ensure_idle()
-            result = self._run_checked_out(proc, job_path, timeout_s, memory_mb)
+            result = self._run_checked_out(proc, job_path, timeout_s, memory_mb, cancel_event)
             self._observe_job(memory_mb, result.peak_bytes, result.duration_s)
             return result
         finally:
@@ -105,12 +105,14 @@ class TechniqueWorkerPoolService(BaseService):
             self._release_slot(reserve_mb)
             self._ensure_idle()
 
-    def _claim_slot(self, memory_mb: int, deadline: float) -> float:
+    def _claim_slot(self, memory_mb: int, deadline: float, cancel_event=None) -> float:
         reserve_mb = self._reserve_mb(memory_mb)
         with self._gate:
             while not self._can_start(reserve_mb):
+                if cancel_event is not None and cancel_event.is_set():
+                    raise TechniqueWorkerBusy("render cancelled")
                 timeout = max(0.0, deadline - time.monotonic())
-                if timeout <= 0 or not self._gate.wait(timeout):
+                if timeout <= 0 or not self._gate.wait(min(timeout, 0.2)):
                     raise TechniqueWorkerBusy("renderer busy; retry shortly")
             self._active += 1
             self._reserved_mb += reserve_mb
@@ -150,13 +152,18 @@ class TechniqueWorkerPoolService(BaseService):
                 pass
         return max(64.0, budget * 0.85)
 
-    def _take_idle(self, deadline: float):
+    def _take_idle(self, deadline: float, cancel_event=None):
         self._ensure_idle()
-        timeout = max(0.0, deadline - time.monotonic())
-        try:
-            return self._idle.get(timeout=timeout)
-        except queue.Empty:
-            raise TechniqueWorkerBusy("renderer busy; no warm technique worker became ready")
+        while True:
+            if cancel_event is not None and cancel_event.is_set():
+                raise TechniqueWorkerBusy("render cancelled")
+            timeout = max(0.0, deadline - time.monotonic())
+            if timeout <= 0:
+                raise TechniqueWorkerBusy("renderer busy; no warm technique worker became ready")
+            try:
+                return self._idle.get(timeout=min(timeout, 0.2))
+            except queue.Empty:
+                pass
 
     def _ensure_idle(self):
         if not self.loaded:
@@ -197,10 +204,10 @@ class TechniqueWorkerPoolService(BaseService):
                 self._warming = max(0, self._warming - 1)
             self._ensure_idle()
 
-    def _run_checked_out(self, proc, job_path: str, timeout_s: float, memory_mb: int) -> TechniqueWorkerResult:
+    def _run_checked_out(self, proc, job_path: str, timeout_s: float, memory_mb: int, cancel_event=None) -> TechniqueWorkerResult:
         stop = threading.Event()
         mem = {"killed": False, "peak": 0}
-        wd = self._watch_memory(proc, max(64, int(memory_mb)) * 1024 * 1024, stop, mem)
+        wd = self._watch_memory(proc, max(64, int(memory_mb)) * 1024 * 1024, stop, mem, cancel_event)
         t0 = time.time()
         try:
             try:
@@ -214,13 +221,16 @@ class TechniqueWorkerPoolService(BaseService):
                 wd.join(timeout=1.0)
         return TechniqueWorkerResult(proc.returncode, stdout or b"", stderr or b"", mem["killed"], mem["peak"], time.time() - t0)
 
-    def _watch_memory(self, proc, cap: int, stop: threading.Event, mem: dict):
-        if psutil is None:
-            return None
+    def _watch_memory(self, proc, cap: int, stop: threading.Event, mem: dict, cancel_event=None):
         def run():
-            try: p = psutil.Process(proc.pid)
-            except psutil.Error: return
+            try: p = psutil.Process(proc.pid) if psutil is not None else None
+            except Exception: return
             while not stop.wait(0.2):
+                if cancel_event is not None and cancel_event.is_set():
+                    self._kill(proc)
+                    return
+                if p is None:
+                    continue
                 try:
                     rss = p.memory_info().rss + sum((c.memory_info().rss for c in p.children(recursive=True)), 0)
                 except psutil.Error:
