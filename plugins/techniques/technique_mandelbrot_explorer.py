@@ -10,6 +10,7 @@ except NameError:
 
 _SPOTS = {
     "full":          (-0.5,      0.0,       0.0, 200),  # the whole set
+    "dendrite_tip":  (-2.0,      0.0,       8.0, 500),  # left antenna tip; classic deep-zoom branch point
     "seahorse":      (-0.7453,   0.1127,    9.0, 400),  # west "valley" between cardioid and period-2 bulb
     "elephant":      ( 0.2825,   0.01,      8.0, 400),  # east valley off the cardioid
     "triple_spiral": (-0.088,    0.654,     8.0, 400),  # upper antenna, triple-armed spiral
@@ -18,23 +19,28 @@ _SPOTS = {
 }
 
 
+def _target_center(spot, pan_x, pan_y):
+    key = str(spot)
+    if key == "full" or key not in _SPOTS:
+        return float(pan_x), float(pan_y)
+    return _SPOTS[key][0], _SPOTS[key][1]
+
+
 class MandelbrotExplorerTechnique(BaseTechnique):
     name = 'Mandelbrot Explorer'
-    description = "A guided tour of the Mandelbrot set's most famous landmarks. Pick a spot -- Seahorse Valley, Elephant Valley, dendritic lightning patterns, deep spiral galaxies -- and the view, zoom, and iteration depth are all dialed in for you. Pair with any palette to taste. Pan, zoom, and iteration controls let you wander off the preset and chase your own detail. Optimized for M1: complex64 working set, cardioid + period-2 bulb early-exit, and live-buffer compaction every 3 iterations."
+    description = "A guided tour of the Mandelbrot set's most famous landmarks. Full Set uses Center as literal complex-plane coordinates, so x=-2, y=0 lands on the left dendrite tip. Landmark presets supply their own center, zoom, and iteration depth. Pair with any palette to taste. Optimized for M1: complex64 working set, cardioid + period-2 bulb early-exit, and live-buffer compaction every 3 iterations."
     kind = "background"
     palette = Palette()
-    spot = Enum([('full', 'Full Set'), ('seahorse', 'Seahorse Valley'), ('elephant', 'Elephant Valley'), ('triple_spiral', 'Triple Spiral'), ('lightning', 'Lightning'), ('spiral_galaxy', 'Spiral Galaxy')], default='full')
-    # Pan range ±3 (= 1.5 view-widths to either side) so you can navigate
-    # between adjacent features at deep zoom; capping at ±1 only let you
-    # move by half a screen, which felt like nothing once zoomed in.
-    pan_x = Slider(-3.0, 3.0, default=0.0, step=0.05)
-    pan_y = Slider(-3.0, 3.0, default=0.0, step=0.05)
-    pan = Pan(x='pan_x', y='pan_y', label='Pan')
+    spot = Enum([('full', 'Full Set'), ('dendrite_tip', 'Dendrite Tip'), ('seahorse', 'Seahorse Valley'), ('elephant', 'Elephant Valley'), ('triple_spiral', 'Triple Spiral'), ('lightning', 'Lightning'), ('spiral_galaxy', 'Spiral Galaxy')], default='full')
+    pan_x = Slider(-2.5, 1.0, default=-0.5, step=0.01)
+    pan_y = Slider(-1.5, 1.5, default=0.0, step=0.01)
+    pan = Pan(x='pan_x', y='pan_y', label='Center')
     zoom_extra = Slider(0.5, 32.0, default=1.0, step=0.05, label='Zoom')
     iterations = Slider(0, 3000, default=1500, step=10, label='Iterations')
 
     def run(self, canvas):
-        cx, cy, zoom_exp, detail = _SPOTS.get(str(self.spot), _SPOTS["full"])
+        _, _, zoom_exp, detail = _SPOTS.get(str(self.spot), _SPOTS["full"])
+        cx_eff, cy_eff = _target_center(self.spot, self.pan_x, self.pan_y)
         W, H = int(canvas.width), int(canvas.height)
         zoom = float(2.0 ** zoom_exp) * float(self.zoom_extra)
         iter_override = int(self.iterations)
@@ -54,9 +60,6 @@ class MandelbrotExplorerTechnique(BaseTechnique):
         long_edge = max(W, H)
         half_x = half * W / long_edge
         half_y = half * H / long_edge
-        # Pan offsets the view center; ±1 on the slider moves by a full half-view.
-        cx_eff = cx + float(self.pan_x) * half
-        cy_eff = cy + float(self.pan_y) * half
         re = np.linspace(cx_eff - half_x, cx_eff + half_x, W, dtype=real)
         im = np.linspace(cy_eff - half_y, cy_eff + half_y, H, dtype=real)
         R, I = np.meshgrid(re, im)  # both (H, W)
