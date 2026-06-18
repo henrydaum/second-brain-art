@@ -16,7 +16,7 @@ class MoireInterferenceTechnique(BaseTechnique):
     kind = "background"
     palette = Palette()
     pattern = Enum([('beats', 'Parallel Beats'), ('crosshatch', 'Crosshatch'), ('rosette', 'Radial Rosette'), ('turbulent', 'Turbulent')], default='beats')
-    phase = Slider(0, 1, default=0, step=0.01, loop=True)
+    phase = Slider(0, 1, default=0, step=0.01)
 
     def run(self, canvas):
         s = int(canvas.size)

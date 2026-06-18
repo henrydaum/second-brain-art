@@ -47,7 +47,7 @@ class RaymarchSdfTechnique(BaseTechnique):
     kind = "background"
     palette = Palette()
     scene = Enum([('spheres', 'Three Spheres'), ('torus', 'Torus'), ('shapes', 'Mixed Shapes')], default='torus')
-    phase = Slider(0, 1, default=0, step=0.01, loop=True)
+    phase = Slider(0, 1, default=0, step=0.01)
 
     def run(self, canvas):
         W, H = int(canvas.width), int(canvas.height)

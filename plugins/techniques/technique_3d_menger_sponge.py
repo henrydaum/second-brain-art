@@ -17,7 +17,7 @@ class MengerSponge3DTechnique(BaseTechnique):
     pitch = Slider(0, 1, default=0.36, step=0.03)
     rotation = Pan(x="yaw", y="pitch")
     scale = Slider(0.55, 1.35, default=0.95, step=0.05)
-    cutout_phase = Slider(0, 1, default=0, step=0.01, loop=True, label="Morph")
+    cutout_phase = Slider(0, 1, default=0, step=0.01, label="Morph")
     depth = Slider(1, 3, default=2, step=1, label="Depth")
     outline = Bool(default=False)
 

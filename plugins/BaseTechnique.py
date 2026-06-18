@@ -56,7 +56,7 @@ class Slider(_ControlDescriptor):
     """
     control_type = "slider"
 
-    def __init__(self, min, max, default=None, *, step=None, label=None, loop=False):
+    def __init__(self, min, max, default=None, *, step=None, label=None):
         if max <= min:
             raise ValueError(f"Slider needs max > min (got min={min}, max={max})")
         self.min = float(min)
@@ -64,7 +64,6 @@ class Slider(_ControlDescriptor):
         self.default = float(default if default is not None else min)
         self.step = float(step if step is not None else (max - min) / 100.0)
         self.label = label
-        self.loop = bool(loop)
 
 
 class Bool(_ControlDescriptor):
@@ -217,7 +216,6 @@ def _compile_descriptors(cls) -> tuple[list[dict], dict[str, dict]] | None:
                 "max": d.max,
                 "step": d.step,
                 "default": d.default,
-                "loop": d.loop,
             })
         elif isinstance(d, Bool):
             param_bounds[attr_name] = {"type": "bool", "default": d.default}

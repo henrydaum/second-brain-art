@@ -77,7 +77,7 @@ class ConwayLifeTechnique(BaseTechnique):
     kind = "background"
     palette = Palette()
     seed_pattern = Enum([('soup', 'Random Soup'), ('r_pentomino', 'R-pentomino'), ('glider_gun', 'Glider Gun'), ('acorn', 'Acorn'), ('replicator', 'Replicator')], default='soup', label='Seed')
-    time = Slider(0, 1, default=0.5, step=0.01, loop=True)
+    time = Slider(0, 1, default=0.5, step=0.01)
 
     def run(self, canvas):
         s = int(canvas.size)

@@ -17,7 +17,7 @@ class ChladniPlateTechnique(BaseTechnique):
     palette = Palette()
     mode_n  = Slider(1, 12, default=4, step=1)
     mode_m  = Slider(1, 12, default=7, step=1)
-    phase   = Slider(0, 1, default=0, step=0.01, loop=True)
+    phase   = Slider(0, 1, default=0, step=0.01)
 
     def run(self, canvas):
         s = int(canvas.size)

@@ -16,7 +16,7 @@ class FlowStreamlinesTechnique(BaseTechnique):
     kind = "background"
     palette = Palette()
     swirl = Enum([('loose', 'Loose'), ('tight', 'Tight'), ('turbulent', 'Turbulent')], default='loose')
-    phase = Slider(0, 1, default=0, step=0.01, loop=True)
+    phase = Slider(0, 1, default=0, step=0.01)
 
     def run(self, canvas):
         s = int(canvas.size)

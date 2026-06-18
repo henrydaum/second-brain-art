@@ -180,6 +180,8 @@ article.credit-error { display: grid; gap: 7px; color: var(--muted); background:
 .video-popup .vp-field input { height: 32px; min-width: 0; padding: 0 8px; border: 1px solid var(--line); background: #10141e; color: var(--text); font-size: 12px; }
 .video-popup .vp-field input:focus { outline: none; border-color: var(--video); }
 .video-popup .vp-frames { margin: 0; font-size: 11px; color: var(--text); font-family: ui-monospace, "Cascadia Code", "Consolas", monospace; }
+.video-popup .vp-loop { display: flex; align-items: center; gap: 7px; font-size: 11px; color: var(--muted); cursor: pointer; }
+.video-popup .vp-loop input { width: 14px; height: 14px; accent-color: var(--video); cursor: pointer; }
 .video-popup .vp-summary { margin: 0 0 2px; font-size: 10.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
 .video-popup .vp-tiers { display: grid; gap: 8px; }
 .video-popup .vp-size-btn { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; height: 36px; padding: 0 12px; border: 1px solid var(--line); background: #10141e; color: var(--text); cursor: pointer; transition: border-color 160ms ease, color 160ms ease; }

@@ -783,7 +783,7 @@ class WebFrontend(BaseFrontend):
     MAX_VIDEO_SECONDS = 10
 
     def render_video(self, session_id: str, specs: list[dict] | None = None, controls: list[dict] | None = None,
-                     fps=None, seconds=None, fmt: str = "gif", scale=1.0) -> list[dict]:
+                     fps=None, seconds=None, fmt: str = "gif", scale=1.0, boomerang: bool = False) -> list[dict]:
         """Render a slider sweep into an animated file and return a download URL.
 
         ``specs`` is a list of ``{chain_index, name}`` — V1 UI sends one, but
@@ -917,6 +917,11 @@ class WebFrontend(BaseFrontend):
         missing = _missing_video_frames(frame_paths)
         if missing:
             return [{"type": "error", "content": f"Video failed: missing rendered frame(s): {', '.join(map(str, missing[:8]))}"}]
+
+        # Boomerang: append the interior frames in reverse for a seamless ping-pong
+        # (excludes both endpoints, so no duplicated/stuttered frame). Output: 2N-2 frames.
+        if boomerang and len(frame_paths) >= 3:
+            frame_paths = list(frame_paths) + frame_paths[-2:0:-1]
 
         try:
             out_path, download_name = encode_frames(
@@ -1645,6 +1650,7 @@ class _Handler(BaseHTTPRequestHandler):
                     controls=list(body.get("controls") or []),
                     fmt="gif",
                     scale=float(body.get("scale") or 1.0),
+                    boomerang=bool(body.get("boomerang")),
                 )})
             if self.path == "/api/regenerate":
                 return self._json({"ok": True, "events": self.server.frontend.regenerate(

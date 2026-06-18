@@ -16,7 +16,7 @@ class SolarDiscTechnique(BaseTechnique):
     kind = "background"
     palette = Palette()
     mood = Enum([('calm', 'Calm'), ('fierce', 'Fierce'), ('eclipse', 'Eclipse')], default='calm')
-    phase = Slider(0, 1, default=0, step=0.01, loop=True)
+    phase = Slider(0, 1, default=0, step=0.01)
 
     def run(self, canvas):
         s = int(canvas.size)

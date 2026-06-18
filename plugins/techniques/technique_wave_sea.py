@@ -17,7 +17,7 @@ class WaveSeaTechnique(BaseTechnique):
     kind = "background"
     palette = Palette()
     weather = Enum([('calm', 'Calm'), ('choppy', 'Choppy'), ('storm', 'Storm')], default='calm')
-    phase = Slider(0, 1, default=0, step=0.01, loop=True)
+    phase = Slider(0, 1, default=0, step=0.01)
 
     def run(self, canvas):
         s = int(canvas.size)

@@ -53,6 +53,7 @@ const pendingControls = new Map();
 const videoSliders = new Set();
 let videoFpsValue = 24;
 let videoSecondsValue = 3;
+let videoBoomerang = false;
 let videoRendering = false;
 let videoCanceling = false;
 let typingEl = null;
@@ -920,6 +921,7 @@ document.addEventListener("click", e => {
 });
 controlsPanel.addEventListener("input", e => {
   const el = e.target;
+  if (el.id === "videoLoop") { videoBoomerang = el.checked; return; }
   if (el.id === "videoFps" || el.id === "videoSeconds") {
     if (el.id === "videoFps") videoFpsValue = Math.min(30, Math.max(1, Math.round(Number(el.value) || 1)));
     else videoSecondsValue = Math.min(10, Math.max(0.1, Number(el.value) || 0.1));
@@ -954,8 +956,7 @@ function renderWidget(panel, spec) {
     const cur = stagedValue(panel.chain_index, spec.name, v[spec.name] ?? spec.default);
     const key = controlKey(panel.chain_index, spec.name);
     const active = videoSliders.has(key);
-    const loopHint = spec.loop ? " Clean loop." : "";
-    return `<div class="ctl-row ctl-slider-row${active ? " video-selected" : ""}${spec.loop ? " loop-slider" : ""}" data-chain="${panel.chain_index}" data-name="${esc(spec.name)}"><span>${esc(spec.label)}</span><input id="${id}" type="range" min="${spec.min}" max="${spec.max}" step="${spec.step}" value="${cur}" style="--fill:${sliderPct(spec.min, spec.max, cur)}%" data-chain="${panel.chain_index}" data-name="${esc(spec.name)}" data-kind="slider"><span class="ctl-val">${fmtNum(cur)}</span><div class="ctl-lane"><button type="button" class="ctl-video-toggle${active ? " active" : ""}" data-video-toggle data-chain="${panel.chain_index}" data-name="${esc(spec.name)}" aria-pressed="${active ? "true" : "false"}" title="Sweep this slider in the video.${loopHint}" aria-label="Sweep ${esc(spec.label)} in video"><svg viewBox="0 0 24 24" width="11" height="11" aria-hidden="true"><path fill="currentColor" d="M8 5v14l11-7z"/></svg></button></div></div>`;
+    return `<div class="ctl-row ctl-slider-row${active ? " video-selected" : ""}" data-chain="${panel.chain_index}" data-name="${esc(spec.name)}"><span>${esc(spec.label)}</span><input id="${id}" type="range" min="${spec.min}" max="${spec.max}" step="${spec.step}" value="${cur}" style="--fill:${sliderPct(spec.min, spec.max, cur)}%" data-chain="${panel.chain_index}" data-name="${esc(spec.name)}" data-kind="slider"><span class="ctl-val">${fmtNum(cur)}</span><div class="ctl-lane"><button type="button" class="ctl-video-toggle${active ? " active" : ""}" data-video-toggle data-chain="${panel.chain_index}" data-name="${esc(spec.name)}" aria-pressed="${active ? "true" : "false"}" title="Sweep this slider in the video." aria-label="Sweep ${esc(spec.label)} in video"><svg viewBox="0 0 24 24" width="11" height="11" aria-hidden="true"><path fill="currentColor" d="M8 5v14l11-7z"/></svg></button></div></div>`;
   }
   if (spec.type === "bool") {
     const on = !!stagedValue(panel.chain_index, spec.name, v[spec.name] ?? spec.default);
@@ -1093,6 +1094,7 @@ function renderVideoPopup() {
       <label class="vp-field"><span>Seconds</span><input id="videoSeconds" type="number" min="0.1" max="10" step="0.1" value="${videoSecondsValue}"></label>
     </div>
     <p class="vp-frames" id="videoFrames">${Math.round(videoFpsValue * videoSecondsValue)} frames</p>
+    <label class="vp-loop"><input id="videoLoop" type="checkbox" ${videoBoomerang ? "checked" : ""}><span>Boomerang</span></label>
     <p class="vp-summary" id="videoSummary">${videoSummaryText()}</p>
     <div class="vp-tiers">
       <button type="button" class="vp-size-btn" data-scale="0.5"><span class="vp-size-label">Low</span><span class="vp-size-dims">— × —</span></button>
@@ -1142,7 +1144,7 @@ async function runVideoTier(btn) {
   if (labelEl) labelEl.textContent = "Cancel";
   loaderTicketStart();
   try {
-    const r = await post("/api/render_video", {specs, controls: [...pendingControls.values()], fps, seconds, scale});
+    const r = await post("/api/render_video", {specs, controls: [...pendingControls.values()], fps, seconds, scale, boomerang: videoBoomerang});
     const ev = (r?.events || []).find(e => e.type === "video_ready");
     if (!ev || !ev.url) {
       const err = (r?.events || []).find(e => e.type === "error");

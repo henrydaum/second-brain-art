@@ -16,7 +16,7 @@ class TorusKnot3DTechnique(BaseTechnique):
     p = Slider(2, 5, default=2, step=1)
     q = Slider(2, 7, default=3, step=1)
     thickness = Slider(0.04, 0.18, default=0.09, step=0.005)
-    roll = Slider(0, 1, default=0, step=0.01, loop=True)
+    roll = Slider(0, 1, default=0, step=0.01)
 
     def run(self, canvas):
         img = canvas.new_layer()

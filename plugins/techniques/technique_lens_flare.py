@@ -19,7 +19,7 @@ class LensFlareTechnique(BaseTechnique):
     sx         = Slider(0.0, 1.0, default=0.30, step=0.05)
     sy         = Slider(0.0, 1.0, default=0.28, step=0.05)
     source     = Pan(x='sx', y='sy')
-    orbit      = Slider(0, 1, default=0, step=0.01, loop=True)
+    orbit      = Slider(0, 1, default=0, step=0.01)
     ghosts     = Slider(0, 8, default=5, step=1)
 
     def run(self, canvas):

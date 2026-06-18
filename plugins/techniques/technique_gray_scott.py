@@ -42,7 +42,7 @@ class GrayScottTechnique(BaseTechnique):
     kind = "background"
     palette = Palette()
     regime = Enum([('spots', 'Spots'), ('maze', 'Maze'), ('worms', 'Worms'), ('coral', 'Coral'), ('uskate', 'U-skate (solitons)')], default='maze')
-    time = Slider(0, 1, default=0.5, step=0.01, loop=True)
+    time = Slider(0, 1, default=0.5, step=0.01)
 
     def run(self, canvas):
         s = int(canvas.size)

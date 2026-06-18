@@ -22,7 +22,7 @@ class FbmLandscapeTechnique(BaseTechnique):
     kind = "background"
     palette = Palette()
     regime = Enum([('clouds', 'Clouds'), ('terrain', 'Terrain'), ('magma', 'Magma'), ('nebula', 'Nebula'), ('ridges', 'Ridged Turbulence')], default='nebula')
-    phase = Slider(0, 1, default=0, step=0.01, loop=True)
+    phase = Slider(0, 1, default=0, step=0.01)
 
     def run(self, canvas):
         s = int(canvas.size)

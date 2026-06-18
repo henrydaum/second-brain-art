@@ -15,7 +15,7 @@ class KaleidoscopeTechnique(BaseTechnique):
     kind = "filter"
 
     segments = Slider(3, 24, default=8, step=1)
-    rotation = Slider(0, 360, default=0, step=1, loop=True)
+    rotation = Slider(0, 360, default=0, step=1)
 
     def run(self, canvas):
         n = int(self.segments)

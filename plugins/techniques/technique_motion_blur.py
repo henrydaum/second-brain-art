@@ -15,7 +15,7 @@ class MotionBlurTechnique(BaseTechnique):
     kind = "filter"
 
     length = Slider(3, 60, default=18, step=1)
-    angle  = Slider(0, 360, default=0, step=1, loop=True)
+    angle  = Slider(0, 360, default=0, step=1)
 
     def run(self, canvas):
         n = int(self.length)
