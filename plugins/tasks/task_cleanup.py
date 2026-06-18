@@ -37,11 +37,20 @@ from pathlib import Path
 
 from paths import DATA_DIR
 from plugins.BaseTask import BaseTask, TaskResult
-from events.event_channels import CLEANUP_DUE
 
 logger = logging.getLogger("TaskCleanup")
 
 RENDERS_DIR = DATA_DIR / "canvas_renders"
+
+# ── Channel (plugin-owned) ─────────────────────────────────────────
+# This task owns its trigger channel rather than importing it from the
+# kernel's event_channels registry: a plugin's channel must live with the
+# plugin so it vanishes on uninstall (see events/event_channels.py header).
+CLEANUP_DUE = "cleanup_due"
+"""Timekeeper-emitted heartbeat asking the cleanup task to enforce its
+periodic cleanups: canvas render cache size cap, stale ephemeral
+conversations, etc. No payload fields are required — the task reads
+all of its policy from config."""
 
 
 class Cleanup(BaseTask):

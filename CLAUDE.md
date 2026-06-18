@@ -89,6 +89,14 @@ plugin *substrate* — the core instantiates the registry and hangs it on the
 runtime as a peer of `tool_registry` (alongside the `canvas` CanvasRuntime peer).
 The technique *files* themselves are still reached only via discovery.
 
+The agent generates *blind* by default: `execute_technique` shows the rendered
+PNG only to the human frontend (via `ToolResult.attachment_paths`). The
+`inspect_canvas` tool (`plugins/tools/tool_inspect_canvas.py`) is the agent's
+eyes — it renders the current canvas and stages it as native vision input for
+the next model call through the mid-turn attachment hook
+(`runtime.add_turn_attachment`). It is opt-in (cost-controlled) and refuses when
+the active model has no native image capability.
+
 Everything else is discovery-based. The agent system prompt collects optional
 guidance from each in-scope plugin's `agent_prompt_for(ctx)` (see `_collect` in
 `agent/system_prompt.py`), so missing plugins degrade silently and correctly —
