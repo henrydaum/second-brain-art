@@ -20,7 +20,7 @@ from state_machine.conversation import ConversationState, Participant
 
 def test_llm_command_can_set_default(monkeypatch):
     saved = []
-    monkeypatch.setattr("plugins.commands.command_llm._save", lambda config: saved.append(dict(config)))
+    monkeypatch.setattr("plugins.commands.command_llm._save", lambda context: saved.append(dict(context.config)))
     context = SimpleNamespace(config={"llm_profiles": {"a": {}, "b": {}}, "default_llm_profile": "a"}, services={})
 
     steps = LlmCommand().form({"model_name": "b"}, context)
@@ -34,9 +34,24 @@ def test_llm_command_can_set_default(monkeypatch):
     assert saved[-1]["default_llm_profile"] == "b"
 
 
+def test_llm_command_set_default_writes_through_to_runtime_config(monkeypatch):
+    saved = []
+    monkeypatch.setattr("plugins.commands.command_llm.config_manager.load_plugin_config", lambda: {"kept": True})
+    monkeypatch.setattr("plugins.commands.command_llm.config_manager.save_plugin_config", lambda values: saved.append(dict(values)))
+    runtime = SimpleNamespace(config={"llm_profiles": {"a": {}, "b": {}}, "default_llm_profile": ""})
+    context = SimpleNamespace(config={"llm_profiles": {"a": {}, "b": {}}, "default_llm_profile": ""}, services={}, runtime=runtime)
+
+    result = LlmCommand().run({"model_name": "b", "action": "set_default"}, context)
+
+    assert result == "Default LLM profile set to: b"
+    assert saved[-1]["kept"] is True
+    assert saved[-1]["default_llm_profile"] == "b"
+    assert runtime.config["default_llm_profile"] == "b"
+
+
 def test_llm_command_add_stores_declared_capabilities(monkeypatch):
     saved = []
-    monkeypatch.setattr("plugins.commands.command_llm._save", lambda config: saved.append(dict(config)))
+    monkeypatch.setattr("plugins.commands.command_llm._save", lambda context: saved.append(dict(context.config)))
     context = SimpleNamespace(config={"llm_profiles": {}, "default_llm_profile": ""}, services={})
 
     steps = LlmCommand().form({"model_name": "add"}, context)
@@ -54,13 +69,15 @@ def test_llm_command_add_stores_declared_capabilities(monkeypatch):
     profile = context.config["llm_profiles"]["openai/gpt-4o"]
     assert [s.name for s in steps][-3:] == ["llm_capability_image", "llm_capability_audio", "llm_capability_video"]
     assert result == "Added LLM profile: openai/gpt-4o"
+    assert context.config["default_llm_profile"] == "openai/gpt-4o"
     assert profile["llm_capabilities"] == {"image": True, "audio": False}
     assert not any(k.startswith("llm_capability_") for k in profile)
     assert saved[-1]["llm_profiles"]["openai/gpt-4o"] == profile
+    assert saved[-1]["default_llm_profile"] == "openai/gpt-4o"
 
 def test_llm_command_can_rename_profile(monkeypatch):
     saved, removed, added = [], [], []
-    monkeypatch.setattr("plugins.commands.command_llm._save", lambda config: saved.append(dict(config)))
+    monkeypatch.setattr("plugins.commands.command_llm._save", lambda context: saved.append(dict(context.config)))
     router = SimpleNamespace(remove_llm=lambda name: removed.append(name), add_llm=lambda name, profile: added.append((name, profile)))
     context = SimpleNamespace(config={"llm_profiles": {"bad": {"llm_endpoint": "https://api.atlascloud.ai/v1"}}, "default_llm_profile": "bad"}, services={"llm": router})
 
@@ -74,6 +91,42 @@ def test_llm_command_can_rename_profile(monkeypatch):
     assert removed == ["bad"]
     assert added[-1][0] == "deepseek-ai/deepseek-v4-pro"
     assert saved[-1]["default_llm_profile"] == "deepseek-ai/deepseek-v4-pro"
+
+
+def test_llm_command_remove_default_selects_next_profile(monkeypatch):
+    saved = []
+    monkeypatch.setattr("plugins.commands.command_llm._save", lambda context: saved.append(dict(context.config)))
+    context = SimpleNamespace(config={"llm_profiles": {"a": {}, "b": {}, "c": {}}, "default_llm_profile": "b"}, services={})
+
+    result = LlmCommand().run({"model_name": "b", "action": "remove"}, context)
+
+    assert result == "Removed LLM profile: b"
+    assert context.config["default_llm_profile"] == "c"
+    assert saved[-1]["default_llm_profile"] == "c"
+
+
+def test_llm_command_add_does_not_replace_existing_default(monkeypatch):
+    saved = []
+    monkeypatch.setattr("plugins.commands.command_llm._save", lambda context: saved.append(dict(context.config)))
+    context = SimpleNamespace(config={"llm_profiles": {"a": {}}, "default_llm_profile": "a"}, services={})
+
+    result = LlmCommand().run({"model_name": "add", "new_model_name": "b"}, context)
+
+    assert result == "Added LLM profile: b"
+    assert context.config["default_llm_profile"] == "a"
+    assert saved[-1]["default_llm_profile"] == "a"
+
+
+def test_llm_command_remove_last_default_blanks_default(monkeypatch):
+    saved = []
+    monkeypatch.setattr("plugins.commands.command_llm._save", lambda context: saved.append(dict(context.config)))
+    context = SimpleNamespace(config={"llm_profiles": {"a": {}}, "default_llm_profile": "a"}, services={})
+
+    result = LlmCommand().run({"model_name": "a", "action": "remove"}, context)
+
+    assert result == "Removed LLM profile: a"
+    assert context.config["default_llm_profile"] == ""
+    assert saved[-1]["default_llm_profile"] == ""
 
 
 # ── /agent ───────────────────────────────────────────────────────────
