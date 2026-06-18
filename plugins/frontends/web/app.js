@@ -65,6 +65,7 @@ const TOOL_LABELS = {
   update_technique: "Updating technique",
   delete_technique: "Deleting technique",
   execute_technique: "Executing technique",
+  inspect_canvas: "Inspecting canvas",
   manage_layers: "Managing layers",
   web_search: "Searching the web",
   sql_query: "Querying database",
