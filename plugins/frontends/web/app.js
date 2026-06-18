@@ -800,18 +800,17 @@ function renderPanel(panel, movableLayers = 0, maxChain = 0) {
         <button type="button" class="ctl-move-btn" data-chain="${ci}" data-dir="up" ${upDisabled ? "disabled" : ""} title="Move layer up" aria-label="Move layer up">▲</button>
         <button type="button" class="ctl-move-btn" data-chain="${ci}" data-dir="down" ${downDisabled ? "disabled" : ""} title="Move layer down" aria-label="Move layer down">▼</button>
       </div>`
-    : "";
+    : `<div class="ctl-move-spacer" aria-hidden="true"></div>`;
   const kind = String(panel.kind || "").toLowerCase();
   const depth = maxChain > 0 ? ci / maxChain : 0;
   const subtitle = panel.kind ? esc(panel.kind) : `Layer ${panel.chain_index}`;
   return `<section class="ctl-panel kind-${esc(kind)}" style="--depth:${depth.toFixed(3)}" data-chain="${panel.chain_index}" data-kind="${esc(panel.kind || "")}" data-technique="${esc(panel.technique_name)}">
     <header class="ctl-head">
       <div class="ctl-controls">
-        <button type="button" class="ctl-remove" data-chain="${panel.chain_index}" title="Remove layer" aria-label="Remove layer"></button>
         ${moveBtns}
+        <button type="button" class="ctl-remove" data-chain="${panel.chain_index}" title="Remove layer" aria-label="Remove layer"></button>
       </div>
       <div><strong>${esc(panel.technique_name)}</strong><span>${subtitle}</span></div>
-      <span class="ctl-layer-num" aria-hidden="true">${ci}</span>
     </header>
     <div class="ctl-body">${empty}</div>
   </section>`;

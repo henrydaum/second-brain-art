@@ -243,13 +243,15 @@ body.share-landing.missing .share-landing-meta { text-align: center; }
 .ctl-panel.kind-background { --kind-c: var(--kind-background); --kind-text: var(--kind-background); }
 .ctl-panel.kind-filter { --kind-c: var(--kind-filter); --kind-text: var(--kind-filter); }
 .ctl-panel.kind-object { --kind-c: var(--kind-object); --kind-text: var(--kind-object); }
-.ctl-head { display: grid; grid-template-columns: auto minmax(0,1fr) auto; align-items: center; gap: 10px; color: var(--text); user-select: none; min-height: 24px; padding-bottom: 8px; border-bottom: 1px solid var(--line-faint); }
+.ctl-head { display: grid; grid-template-columns: auto minmax(0,1fr); align-items: center; gap: 10px; color: var(--text); user-select: none; min-height: 24px; padding-bottom: 8px; border-bottom: 1px solid var(--line-faint); }
 .ctl-head > div:not(.ctl-controls) { min-width: 0; display: grid; gap: 1px; }
 .ctl-head > div > span { font-size: 9.5px; color: var(--kind-text); letter-spacing: .07em; text-transform: uppercase; }
-.ctl-layer-num { justify-self: end; margin-right: calc(var(--lane-gap) + var(--lane-w)); align-self: center; font-size: 40px; font-weight: 800; line-height: .85; color: var(--kind-c); opacity: calc(0.12 + var(--depth) * 0.16); pointer-events: none; user-select: none; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .ctl-head strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; line-height: 1.05; font-weight: 800; color: var(--text); }
 .ctl-controls { display: inline-flex; align-items: center; gap: 4px; }
 .ctl-move { display: inline-flex; flex-direction: column; gap: 1px; }
+/* Holds the move column's footprint (24px) for layers that can't move, so the
+   remove button and technique name stay aligned across all rows. */
+.ctl-move-spacer { width: 24px; }
 .ctl-move-btn { width: 24px; height: 12px; padding: 0; border: 1px solid var(--line); background: #10141e; color: var(--muted); cursor: pointer; font-size: 9px; line-height: 1; display: inline-flex; align-items: center; justify-content: center; }
 .ctl-move-btn:not(:disabled):hover { border-color: var(--accent); color: var(--accent); }
 .ctl-move-btn:disabled { opacity: .25; cursor: default; }
