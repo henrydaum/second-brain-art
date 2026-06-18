@@ -167,7 +167,7 @@ sees a different image — bad.
 
 CONTROLS
 --------
-A technique may expose up to **4 non-palette controls** plus an optional
+A technique may expose up to **5 non-palette controls** plus an optional
 `Palette()` for palette-aware techniques. Controls render as widgets on the
 canvas — sliders, toggles, arrow pads — and re-run the chain whenever the
 user adjusts one. Used well, they turn near-miss completions into

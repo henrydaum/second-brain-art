@@ -299,7 +299,7 @@ class BaseTechnique:
             create_technique tool. ``0.0`` triggers a fallback to file mtime.
         controls:
             Optional list of user-facing controls (slider/enum/bool/pan/
-            palette). Max 4
+            palette). Max 5
             non-palette controls; add a palette control only when the
             technique uses palette and should expose a layer override.
 
