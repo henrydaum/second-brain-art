@@ -91,12 +91,14 @@ function clearStatus() {
   if (typingEl) { typingEl.remove(); typingEl = null; }
 }
 let agentBusy = false;
-const sendBtn = form.querySelector("button:not(#controlsToggle)");
+const sendBtn = document.querySelector("#sendBtn");
+const chatClear = document.querySelector("#chatClear");
 
 // ----- Technique search (used when the controls drawer is open) -----
 let techniquesCache = [];            // last /api/techniques response
 let techniquesLoading = null;        // in-flight fetch promise (dedup)
 let inSearchMode = false;        // drawer open → input is a technique picker
+let searchFocused = false;       // input focused while in search mode → results take over the column
 const CHAT_PLACEHOLDER = input.placeholder;
 const SEARCH_PLACEHOLDER = "Search techniques...";
 
@@ -585,10 +587,10 @@ function renderControlsPanel(panels) {
   refreshControlsToggleEnabled();
   controlsDrawer.hidden = false;
   if (!hasImage) {
-    // Blank canvas: no layers to edit and no Regenerate button to offer,
-    // but the search input above is fully functional — let the user add
-    // their first background from here.
-    controlsPanel.innerHTML = `<div class="ctl-empty-canvas">No layers yet — search below to add layers to the canvas,\n or press the controls icon to go back.</div>`;
+    // Blank canvas: no layers to edit and no Regenerate button to offer.
+    // The search input above is fully functional and, while empty, browses the
+    // full technique catalog — so the panel itself stays empty.
+    controlsPanel.innerHTML = "";
     if (localStorage.sbDrawerOpen === "1") setControlsOpen(true);
     return;
   }
@@ -597,7 +599,7 @@ function renderControlsPanel(panels) {
   const stack = [...currentControlsPanels].sort((a, b) => b.chain_index - a.chain_index).map(p => renderPanel(p, movableLayers, maxChain)).join("");
   const dirty = pendingControls.size ? " dirty" : "";
   const videoDisabled = selectedVideoSpecs().length ? "" : " disabled";
-  const regen = `<section class="ctl-actions"><button type="button" class="ctl-global${dirty}" id="globalRegenerate" title="Apply staged controls with the current seed"><span>Regenerate</span></button><button type="button" class="ctl-global${dirty}" id="globalRandomize" title="Apply staged controls with a fresh random seed"><span>Randomize</span></button><span class="video-action-wrap"><button type="button" class="ctl-global" id="globalVideo" title="Render a GIF from checked sliders"${videoDisabled}><span>Video</span></button>${renderVideoPopup()}</span></section>`;
+  const regen = `<section class="ctl-actions"><div class="ctl-actions-left"><button type="button" class="ctl-global${dirty}" id="globalRegenerate" title="Apply staged controls with the current seed"><span>Regenerate</span></button><button type="button" class="ctl-global${dirty}" id="globalRandomize" title="Apply staged controls with a fresh random seed"><span>Randomize</span></button></div><span class="video-action-wrap"><button type="button" class="ctl-play" id="globalVideo" title="Render a GIF from the sliders set to sweep"${videoDisabled} aria-label="Render video"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="M4 4h16a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1Zm1 3v2h2V7H5Zm0 4v2h2v-2H5Zm0 4v2h2v-2H5Zm14-8v2h-2V7h2Zm0 4v2h-2v-2h2Zm0 4v2h-2v-2h2Z"/></svg></button>${renderVideoPopup()}</span></section>`;
   controlsPanel.innerHTML = stack + regen;
   if (localStorage.sbDrawerOpen === "1") setControlsOpen(true);
   markDirtyControls();
@@ -659,10 +661,9 @@ function rankTechniques(query) {
     if (allMatched) out.push({ technique: s, score });
   }
   out.sort((a, b) => b.score - a.score || a.technique.slug.length - b.technique.slug.length || a.technique.slug.localeCompare(b.technique.slug));
-  // Cap kept tight (10) because results render inline with the controls
-  // panel in a shared scroll container — a long tail would push layer
-  // controls off-screen. Keep typing to narrow if 10 isn't enough.
-  return out.slice(0, 10).map(r => r.technique);
+  // No cap: while browsing, results take over the whole drawer column in their
+  // own scroll zone, so a long tail is fine — it doesn't crowd layer controls.
+  return out.map(r => r.technique);
 }
 
 function renderSearchResults(rows, { semantic = false } = {}) {
@@ -690,18 +691,31 @@ function renderSearchResults(rows, { semantic = false } = {}) {
 }
 
 function showSearchResults(show) {
-  // Results coexist with the layer controls in one scroll zone — only the
-  // results visibility toggles. The controls stay visible underneath.
+  // "Browsing" = the results take over the whole drawer column: the `searching`
+  // class hides .controls-panel (layers + actions) and reveals the results.
   techniqueSearchResults.hidden = !show;
+  controlsDrawer.classList.toggle("searching", !!show);
+}
+
+function allTechniquesAlphabetical() {
+  return [...techniquesCache].sort((a, b) =>
+    String(a.name || a.slug || "").localeCompare(String(b.name || b.slug || ""), undefined, { sensitivity: "base" })
+  );
+}
+
+function updateClearBtn() {
+  // The clear (×) shows whenever the bar has content, in any mode.
+  if (chatClear) chatClear.hidden = !input.value;
 }
 
 function updateSearch() {
-  if (!inSearchMode) return;
+  if (!inSearchMode || !searchFocused) return;
   const q = input.value.trim();
   // Enable the Search button only when the agent isn't busy and there's a query
   if (!agentBusy) sendBtn.disabled = !q;
-  if (!q) { showSearchResults(false); return; }
-  renderSearchResults(rankTechniques(q));
+  // Focused: results own the column. Empty query → full alphabetical catalog;
+  // typing narrows it live.
+  renderSearchResults(q ? rankTechniques(q) : allTechniquesAlphabetical());
   showSearchResults(true);
 }
 
@@ -720,18 +734,40 @@ function setSearchMode(on) {
       sendBtn.textContent = "Send";
       sendBtn.disabled = false;
     }
+    searchFocused = false;
     showSearchResults(false);
   }
   form.classList.toggle("search-mode", inSearchMode);
 }
 
-input.addEventListener("input", updateSearch);
+input.addEventListener("input", () => { updateClearBtn(); updateSearch(); });
+input.addEventListener("focus", () => {
+  if (!inSearchMode) return;
+  searchFocused = true;
+  loadTechniques().then(() => updateSearch());
+});
+input.addEventListener("blur", () => {
+  // Leaving the bar reverts the column to the layer controls. Clicks inside the
+  // results don't reach here — the results' mousedown handler keeps focus.
+  searchFocused = false;
+  showSearchResults(false);
+});
 input.addEventListener("keydown", (e) => {
   if (e.key === "Escape" && inSearchMode) {
     e.preventDefault();
-    input.value = "";
-    setControlsOpen(false);
+    input.blur();  // revert to controls, keep the drawer open
   }
+});
+// Keep focus on the input when interacting with results so browsing persists
+// (so a + Add click doesn't blur the bar and snap back to the controls view).
+techniqueSearchResults.addEventListener("mousedown", (e) => e.preventDefault());
+// Same for the Search button: a semantic lookup shouldn't blur the bar.
+sendBtn.addEventListener("mousedown", (e) => { if (inSearchMode && searchFocused) e.preventDefault(); });
+chatClear?.addEventListener("mousedown", (e) => e.preventDefault());  // we drive focus ourselves below
+chatClear?.addEventListener("click", () => {
+  input.value = "";
+  updateClearBtn();
+  input.blur();  // clear + drop focus → reverts the column to the controls
 });
 
 techniqueSearchResults.addEventListener("click", async (e) => {
@@ -919,34 +955,34 @@ function renderWidget(panel, spec) {
     const key = controlKey(panel.chain_index, spec.name);
     const active = videoSliders.has(key);
     const loopHint = spec.loop ? " Clean loop." : "";
-    return `<div class="ctl-row ctl-slider-row${active ? " video-selected" : ""}${spec.loop ? " loop-slider" : ""}" data-chain="${panel.chain_index}" data-name="${esc(spec.name)}"><span>${esc(spec.label)}</span><input id="${id}" type="range" min="${spec.min}" max="${spec.max}" step="${spec.step}" value="${cur}" style="--fill:${sliderPct(spec.min, spec.max, cur)}%" data-chain="${panel.chain_index}" data-name="${esc(spec.name)}" data-kind="slider"><span class="ctl-val">${fmtNum(cur)}</span><button type="button" class="ctl-video-toggle${active ? " active" : ""}" data-video-toggle data-chain="${panel.chain_index}" data-name="${esc(spec.name)}" aria-pressed="${active ? "true" : "false"}" title="Include this slider in video.${loopHint}" aria-label="Include ${esc(spec.label)} in video">&#10003;</button></div>`;
+    return `<div class="ctl-row ctl-slider-row${active ? " video-selected" : ""}${spec.loop ? " loop-slider" : ""}" data-chain="${panel.chain_index}" data-name="${esc(spec.name)}"><span>${esc(spec.label)}</span><input id="${id}" type="range" min="${spec.min}" max="${spec.max}" step="${spec.step}" value="${cur}" style="--fill:${sliderPct(spec.min, spec.max, cur)}%" data-chain="${panel.chain_index}" data-name="${esc(spec.name)}" data-kind="slider"><span class="ctl-val">${fmtNum(cur)}</span><div class="ctl-lane"><button type="button" class="ctl-video-toggle${active ? " active" : ""}" data-video-toggle data-chain="${panel.chain_index}" data-name="${esc(spec.name)}" aria-pressed="${active ? "true" : "false"}" title="Sweep this slider in the video.${loopHint}" aria-label="Sweep ${esc(spec.label)} in video"><svg viewBox="0 0 24 24" width="11" height="11" aria-hidden="true"><path fill="currentColor" d="M8 5v14l11-7z"/></svg></button></div></div>`;
   }
   if (spec.type === "bool") {
     const on = !!stagedValue(panel.chain_index, spec.name, v[spec.name] ?? spec.default);
-    return `<label class="ctl-row" data-chain="${panel.chain_index}" data-name="${esc(spec.name)}"><span>${esc(spec.label)}</span><input type="checkbox" ${on?"checked":""} data-chain="${panel.chain_index}" data-name="${esc(spec.name)}" data-kind="bool"></label>`;
+    return `<label class="ctl-row" data-chain="${panel.chain_index}" data-name="${esc(spec.name)}"><span>${esc(spec.label)}</span><input type="checkbox" ${on?"checked":""} data-chain="${panel.chain_index}" data-name="${esc(spec.name)}" data-kind="bool"><div class="ctl-lane"></div></label>`;
   }
   if (spec.type === "enum") {
     const cur = stagedValue(panel.chain_index, spec.name, v[spec.name] ?? spec.default);
     const opts = (spec.options || []).map(o =>
       `<button type="button" class="${JSON.stringify(o.value)===JSON.stringify(cur)?"ctl-seg active":"ctl-seg"}" data-chain="${panel.chain_index}" data-name="${esc(spec.name)}" data-kind="enum" data-value='${esc(JSON.stringify(o.value))}'>${esc(o.label)}</button>`
     ).join("");
-    return `<div class="ctl-row" data-chain="${panel.chain_index}" data-name="${esc(spec.name)}"><span>${esc(spec.label)}</span><div class="ctl-segs">${opts}</div></div>`;
+    return `<div class="ctl-row" data-chain="${panel.chain_index}" data-name="${esc(spec.name)}"><span>${esc(spec.label)}</span><div class="ctl-segs">${opts}</div><div class="ctl-lane"></div></div>`;
   }
   if (spec.type === "pan") {
     const xp = spec.x_param, yp = spec.y_param;
     const xv = stagedValue(panel.chain_index, xp, v[xp] ?? spec.x_default ?? 0);
     const yv = stagedValue(panel.chain_index, yp, v[yp] ?? spec.y_default ?? 0);
-    return `<div class="ctl-row" data-chain="${panel.chain_index}" data-xparam="${esc(xp)}" data-yparam="${esc(yp)}"><span>${esc(spec.label)}</span><div class="ctl-pan" data-chain="${panel.chain_index}" data-name="${esc(spec.name)}" data-xparam="${esc(xp)}" data-yparam="${esc(yp)}" data-step="${spec.step}" data-x="${xv}" data-y="${yv}"><button type="button" class="ctl-pan-up" data-dir="up">↑</button><button type="button" class="ctl-pan-left" data-dir="left">←</button><span class="ctl-pan-c"></span><button type="button" class="ctl-pan-right" data-dir="right">→</button><button type="button" class="ctl-pan-down" data-dir="down">↓</button></div><span class="ctl-val ctl-pan-val">x ${fmtNum(xv)} · y ${fmtNum(yv)}</span></div>`;
+    return `<div class="ctl-row" data-chain="${panel.chain_index}" data-xparam="${esc(xp)}" data-yparam="${esc(yp)}"><span>${esc(spec.label)}</span><div class="ctl-pan" data-chain="${panel.chain_index}" data-name="${esc(spec.name)}" data-xparam="${esc(xp)}" data-yparam="${esc(yp)}" data-step="${spec.step}" data-x="${xv}" data-y="${yv}"><button type="button" class="ctl-pan-up" data-dir="up">↑</button><button type="button" class="ctl-pan-left" data-dir="left">←</button><span class="ctl-pan-c"></span><button type="button" class="ctl-pan-right" data-dir="right">→</button><button type="button" class="ctl-pan-down" data-dir="down">↓</button></div><span class="ctl-val ctl-pan-val">x ${fmtNum(xv)} · y ${fmtNum(yv)}</span><div class="ctl-lane"></div></div>`;
   }
   if (spec.type === "text") {
     const cur = stagedValue(panel.chain_index, spec.name, v[spec.name] ?? spec.default ?? "");
     const ph = spec.placeholder ? ` placeholder="${esc(spec.placeholder)}"` : "";
-    return `<label class="ctl-row" for="${id}" data-chain="${panel.chain_index}" data-name="${esc(spec.name)}"><span>${esc(spec.label)}</span><input id="${id}" type="text" value="${esc(cur)}" maxlength="${spec.max_length || 120}"${ph} data-chain="${panel.chain_index}" data-name="${esc(spec.name)}" data-kind="text"></label>`;
+    return `<label class="ctl-row" for="${id}" data-chain="${panel.chain_index}" data-name="${esc(spec.name)}"><span>${esc(spec.label)}</span><input id="${id}" type="text" value="${esc(cur)}" maxlength="${spec.max_length || 120}"${ph} data-chain="${panel.chain_index}" data-name="${esc(spec.name)}" data-kind="text"><div class="ctl-lane"></div></label>`;
   }
   if (spec.type === "palette") {
     const cur = stagedValue(panel.chain_index, "palette", v.palette || "");
     const swatches = palettesCache.map(p => paletteSwatchHtml(p, cur)).join("");
-    return `<div class="ctl-row ctl-palette" data-chain="${panel.chain_index}" data-name="palette"><span>${esc(spec.label || "Palette")}</span><div class="ctl-palette-control"><button type="button" class="ctl-palette-trigger" data-palette-trigger aria-haspopup="true" aria-expanded="false"><span class="ctl-palette-cur">${paletteCurBars(cur)}</span><span class="ctl-palette-caret">▾</span></button><div class="ctl-palette-pop" hidden>${swatches}</div></div></div>`;
+    return `<div class="ctl-row ctl-palette" data-chain="${panel.chain_index}" data-name="palette"><span>${esc(spec.label || "Palette")}</span><div class="ctl-palette-control"><button type="button" class="ctl-palette-trigger" data-palette-trigger aria-haspopup="true" aria-expanded="false"><span class="ctl-palette-cur">${paletteCurBars(cur)}</span><span class="ctl-palette-caret">▾</span></button><div class="ctl-palette-pop" hidden>${swatches}</div></div><div class="ctl-lane"></div></div>`;
   }
   return "";
 }

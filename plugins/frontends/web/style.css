@@ -5,6 +5,10 @@
   --accent: var(--cyan);
   --accent-2: var(--hot);
   --accent-glow: rgba(127,200,212,.10);
+  /* Video system signature: a reserved magenta, used nowhere else, so scattered
+     video controls read as one system by color + their round shape. */
+  --video:#e0739c;
+  --video-glow: rgba(224,115,156,.22);
   --line-faint: rgba(255,255,255,.07);
   --ctl-h: 30px;
   --kind-background: #b5e0a8;
@@ -168,24 +172,24 @@ article.credit-error { display: grid; gap: 7px; color: var(--muted); background:
 .download-panel .dp-size-btn:hover:not(:disabled) .dp-size-dims { color: var(--accent); }
 
 /* ----- Video popup ----- */
-.video-popup { position: absolute; left: 0; bottom: calc(100% + 10px); z-index: 8; display: grid; gap: 8px; width: min(260px, calc(100vw - 48px)); padding: 14px; border: 1px solid rgba(255,255,255,.24); background: rgba(5,7,12,.96); backdrop-filter: blur(16px); box-shadow: 0 18px 42px rgba(0,0,0,.42); }
+.video-popup { position: absolute; right: 0; bottom: calc(100% + 10px); z-index: 8; display: grid; gap: 8px; width: min(260px, calc(100vw - 48px)); padding: 14px; border: 1px solid rgba(255,255,255,.24); background: rgba(5,7,12,.96); backdrop-filter: blur(16px); box-shadow: 0 18px 42px rgba(0,0,0,.42); }
 .video-popup[hidden] { display: none; }
 .video-popup .vp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .video-popup .vp-field { display: flex; flex-direction: column; gap: 4px; font-size: 11px; color: var(--muted); }
 .video-popup .vp-field > span { text-transform: uppercase; letter-spacing: .06em; font-size: 10px; }
 .video-popup .vp-field input { height: 32px; min-width: 0; padding: 0 8px; border: 1px solid var(--line); background: #10141e; color: var(--text); font-size: 12px; }
-.video-popup .vp-field input:focus { outline: none; border-color: var(--accent); }
+.video-popup .vp-field input:focus { outline: none; border-color: var(--video); }
 .video-popup .vp-frames { margin: 0; font-size: 11px; color: var(--text); font-family: ui-monospace, "Cascadia Code", "Consolas", monospace; }
 .video-popup .vp-summary { margin: 0 0 2px; font-size: 10.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
 .video-popup .vp-tiers { display: grid; gap: 8px; }
 .video-popup .vp-size-btn { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; height: 36px; padding: 0 12px; border: 1px solid var(--line); background: #10141e; color: var(--text); cursor: pointer; transition: border-color 160ms ease, color 160ms ease; }
-.video-popup .vp-size-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.video-popup .vp-size-btn:hover:not(:disabled) { border-color: var(--video); color: var(--video); }
 .video-popup .vp-size-btn:disabled { opacity: .7; cursor: progress; }
 .video-popup .vp-size-btn.cancel { border-color: var(--accent-2); color: var(--accent-2); }
 .video-popup .vp-size-btn.cancel:hover { background: var(--accent-2); color: #08090d; }
 .video-popup .vp-size-btn .vp-size-label { font-weight: 700; letter-spacing: .01em; }
 .video-popup .vp-size-btn .vp-size-dims { font-size: 11px; color: var(--muted); font-family: ui-monospace, "Cascadia Code", "Consolas", monospace; }
-.video-popup .vp-size-btn:hover:not(:disabled) .vp-size-dims { color: var(--accent); }
+.video-popup .vp-size-btn:hover:not(:disabled) .vp-size-dims { color: var(--video); }
 #linkModal .modal-card.link-modal-card { max-width: 320px; display: grid; gap: 14px; place-items: center; text-align: center; }
 #linkModal .link-modal-card .sp-link { width: 100%; display: flex; gap: 6px; }
 #linkModal .link-modal-card input { flex: 1 1 auto; min-width: 0; height: 34px; padding: 0 10px; background: #10141e; border: 1px solid var(--line); color: var(--text); font-family: ui-monospace, monospace; font-size: 11.5px; }
@@ -223,7 +227,7 @@ body.share-landing.missing .share-landing-meta { text-align: center; }
 .chat.controls-open .messages { display: none; }
 .controls-drawer:not(.open) { display: none; }
 .controls-drawer[hidden] { display: none; }
-.controls-panel { padding: 14px 16px; display: flex; flex-direction: column; gap: 14px; flex: 1; }
+.controls-panel { --lane-w: 32px; --lane-gap: 14px; padding: 14px 16px; display: flex; flex-direction: column; gap: 14px; flex: 1; }
 .controls-panel[hidden] { display: none; }
 .controls-panel.loading { cursor: wait; opacity: .85; pointer-events: none; }
 
@@ -246,17 +250,19 @@ body.share-landing.missing .share-landing-meta { text-align: center; }
 .ctl-remove:hover { border-color: var(--accent-2); color: var(--accent-2); }
 .ctl-body { display: grid; gap: 0; }
 .ctl-empty { padding: 8px 0 2px; color: var(--muted); font-size: 12px; }
-.ctl-row { position: relative; display: grid; grid-template-columns: 86px 1fr auto; align-items: center; gap: 8px; min-height: var(--ctl-h); padding: 5px 0 5px 14px; font-size: 12px; color: var(--text); }
+.ctl-row { position: relative; display: grid; grid-template-columns: 86px 1fr auto var(--lane-gap) var(--lane-w); align-items: center; gap: 8px; min-height: var(--ctl-h); padding: 5px 0 5px 14px; font-size: 12px; color: var(--text); }
 .ctl-row + .ctl-row { border-top: 1px solid var(--line-faint); }
 .ctl-row.row-dirty::before { content: ""; position: absolute; left: 2px; top: 50%; transform: translateY(-50%); width: 6px; height: 6px; border-radius: 50%; background: var(--text); }
 .ctl-row.row-dirty > span:first-child { color: var(--text); }
 .ctl-row > span:first-child { color: var(--muted); }
-.ctl-slider-row { grid-template-columns: 86px 1fr auto 24px; }
-.ctl-slider-row.video-selected { background: color-mix(in srgb, var(--accent) 8%, transparent); }
-.ctl-slider-row.video-selected > span:first-child { color: var(--text); }
-.ctl-video-toggle { width: 22px; height: 22px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--line); background: #10141e; color: transparent; cursor: pointer; font-size: 12px; line-height: 1; }
-.ctl-video-toggle:hover { border-color: var(--accent); color: color-mix(in srgb, var(--accent) 42%, transparent); }
-.ctl-video-toggle.active { border-color: var(--accent); background: var(--accent); color: #081018; box-shadow: 0 0 0 2px var(--accent-glow); }
+/* Video system = magenta + round, the signature that sets it apart from the
+   cyan rectangular controls. Round play toggles pick which sliders sweep; they
+   line up into a run terminating in the round play foot. No rules/gutter —
+   color + shape (Gestalt similarity) group them, not enclosure. */
+.ctl-lane { grid-column: -2 / -1; display: flex; align-items: center; justify-content: center; }
+.ctl-video-toggle { width: 24px; height: 24px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border: 1px solid color-mix(in srgb, var(--video) 45%, transparent); border-radius: 50%; background: transparent; color: color-mix(in srgb, var(--video) 60%, transparent); cursor: pointer; line-height: 0; transition: border-color 140ms ease, color 140ms ease, background 140ms ease, box-shadow 140ms ease; }
+.ctl-video-toggle:hover { border-color: var(--video); color: var(--video); background: color-mix(in srgb, var(--video) 12%, transparent); }
+.ctl-video-toggle.active { border-color: var(--video); background: var(--video); color: #1a0e14; box-shadow: 0 0 0 3px var(--video-glow); }
 .ctl-row input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 16px; margin: 0; background: transparent; cursor: pointer; }
 .ctl-row input[type=range]:focus { outline: none; }
 .ctl-row input[type=range]::-webkit-slider-runnable-track { height: 4px; border-radius: 0; background: linear-gradient(90deg, var(--accent) var(--fill, 0%), var(--line) var(--fill, 0%)); }
@@ -282,12 +288,22 @@ body.share-landing.missing .share-landing-meta { text-align: center; }
 .ctl-pan-right { grid-column: 3; grid-row: 2; }
 .ctl-pan-down { grid-column: 2; grid-row: 3; }
 .ctl-pan-val { white-space: nowrap; }
-.ctl-actions { padding-top: 2px; display: flex; justify-content: flex-start; gap: 8px; position: sticky; bottom: -14px; background: linear-gradient(180deg, rgba(8,9,13,0), rgba(8,9,13,.96) 28%); padding-bottom: 10px; }
+/* z-index keeps the sticky row's popup above the panel content above it;
+   padding-right matches the panel body inset so the play foot lines up with
+   the toggle column. */
+.ctl-actions { padding-top: 2px; padding-right: 14px; display: flex; align-items: center; justify-content: space-between; gap: 8px; position: sticky; bottom: -14px; z-index: 5; background: linear-gradient(180deg, rgba(8,9,13,0), rgba(8,9,13,.96) 28%); padding-bottom: 10px; }
+.ctl-actions-left { display: flex; gap: 8px; }
 .video-action-wrap { position: relative; display: inline-flex; }
 .ctl-global { height: 32px; display: inline-flex; align-items: center; gap: 7px; padding: 0 10px; background: #11151d; color: var(--text); border: 1px solid var(--line); cursor: pointer; font-size: 11px; font-weight: 700; letter-spacing: .04em; }
 .ctl-global:hover { border-color: var(--accent); color: var(--accent); }
 .ctl-global.dirty { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-glow); }
 .ctl-global:disabled { opacity: .5; cursor: default; }
+/* Play foot — the render terminus of the video system: round + magenta like the
+   toggles, so it reads as theirs and stands apart from the rectangular cyan
+   Regenerate/Randomize beside it. */
+.ctl-play { height: var(--lane-w); width: var(--lane-w); min-width: var(--lane-w); display: inline-flex; align-items: center; justify-content: center; padding: 0; border-radius: 50%; background: color-mix(in srgb, var(--video) 14%, #11151d); color: var(--video); border: 1px solid var(--video); cursor: pointer; line-height: 0; transition: background 140ms ease, color 140ms ease, box-shadow 140ms ease; }
+.ctl-play:hover:not(:disabled) { background: var(--video); color: #1a0e14; box-shadow: 0 0 0 3px var(--video-glow); }
+.ctl-play:disabled { opacity: .4; cursor: default; color: var(--muted); border-color: var(--line); background: #11151d; }
 .ctl-palette { grid-template-columns: 86px 1fr; }
 .ctl-palette-control { position: relative; justify-self: start; }
 .ctl-palette-trigger { display: inline-flex; align-items: center; gap: 7px; padding: 0; background: transparent; border: 0; color: var(--muted); cursor: pointer; font-size: 11px; }
@@ -439,6 +455,12 @@ body.legal-body { background:
 .composer.search-mode .chat-input-search-icon { opacity: 1; }
 .composer.search-mode .chat-input-wrap input { padding-left: 36px; background: rgba(127,200,212,.08); border-color: rgba(127,200,212,.45); }
 .composer.search-mode .chat-input-wrap input:focus { border-color: var(--accent); background: rgba(127,200,212,.14); }
+/* Clear (×) — mirrors the magnifier: same 12px edge inset on the right.
+   Scoped under .chat-input-wrap to outrank the generic `.composer button` fill. */
+.chat-input-wrap .chat-input-clear { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); width: 20px; min-width: 0; height: 20px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 50%; background: rgba(255,255,255,.12); color: var(--muted); cursor: pointer; transition: background 160ms ease, color 160ms ease; }
+.chat-input-wrap .chat-input-clear:hover { background: rgba(255,255,255,.22); color: var(--text); filter: none; }
+.chat-input-wrap .chat-input-clear[hidden] { display: none; }
+.chat-input-wrap:has(#chatClear:not([hidden])) input { padding-right: 36px; }
 
 /* ----- Technique search results -----
    Shares the drawer's scroll container with .controls-panel so a query
@@ -448,8 +470,10 @@ body.legal-body { background:
    results and the layer controls below. */
 .technique-search-results { padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; }
 .technique-search-results[hidden] { display: none; }
+/* Browsing (search box focused): results take over the whole drawer column. */
+.controls-drawer.searching .controls-panel { display: none; }
+.controls-drawer.searching .technique-search-results { flex: 1; overflow-y: auto; }
 .technique-search-empty { padding: 16px; text-align: center; color: var(--muted); font-size: 13px; }
-.ctl-empty-canvas { padding: 14px 16px; text-align: center; color: var(--muted); font-size: 13px; line-height: 1.5; flex: 1; display: flex; align-items: center; justify-content: center; }
 .technique-result-row { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 10px; padding: 9px 11px; border: 1px solid rgba(127,200,212,.28); background: rgba(127,200,212,.06); transition: border-color 160ms ease, background 160ms ease; }
 .technique-result-row:hover { border-color: rgba(127,200,212,.55); background: rgba(127,200,212,.12); }
 .technique-result-meta { display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: start; min-width: 0; }
