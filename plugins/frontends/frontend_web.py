@@ -59,7 +59,7 @@ _ARTIST_PROFILE_BASE = {
     "llm": "default",
     "prompt_suffix": "",
     "whitelist_or_blacklist_tools": "whitelist",
-    "tools_list": ["search_techniques", "execute_technique", "manage_layers", "read_technique"],
+    "tools_list": ["search_techniques", "execute_technique", "manage_layers", "inspect_canvas", "read_technique"],
 }
 _ARTIST_PROFILE_AUTHOR = {
     "llm": "default",
@@ -67,7 +67,7 @@ _ARTIST_PROFILE_AUTHOR = {
     "whitelist_or_blacklist_tools": "whitelist",
     "tools_list": [
         "search_techniques", "create_technique", "update_technique", "delete_technique",
-        "execute_technique", "manage_layers", "read_technique", "read_technique_guide",
+        "execute_technique", "manage_layers", "inspect_canvas", "read_technique", "read_technique_guide",
     ],
 }
 
@@ -273,9 +273,9 @@ class WebFrontend(BaseFrontend):
             session.technique_authoring_enabled = authoring
         tool_line = (
             "search_techniques, read_technique_guide, read_technique, create_technique, update_technique, "
-            "execute_technique, manage_layers"
+            "execute_technique, manage_layers, inspect_canvas"
             if authoring
-            else "search_techniques, read_technique, execute_technique, manage_layers"
+            else "search_techniques, read_technique, execute_technique, manage_layers, inspect_canvas"
         )
         self.runtime.add_system_prompt_extra(
             key,
