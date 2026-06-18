@@ -604,6 +604,7 @@ function renderControlsPanel(panels) {
   controlsPanel.innerHTML = stack + regen;
   if (localStorage.sbDrawerOpen === "1") setControlsOpen(true);
   markDirtyControls();
+  layoutVideoConnector();
 }
 function setControlsOpen(open) {
   controlsDrawer.classList.toggle("open", open);
@@ -611,6 +612,7 @@ function setControlsOpen(open) {
   chat.classList.toggle("controls-open", open);
   localStorage.sbDrawerOpen = open ? "1" : "0";
   setSearchMode(!!open);
+  if (open) requestAnimationFrame(layoutVideoConnector);
 }
 
 // ----- Technique search wiring -----
@@ -815,6 +817,7 @@ function renderPanel(panel, movableLayers = 0, maxChain = 0) {
   </section>`;
 }
 controlsToggle.addEventListener("click", () => setControlsOpen(!controlsDrawer.classList.contains("open")));
+window.addEventListener("resize", () => requestAnimationFrame(layoutVideoConnector));
 controlsPanel.addEventListener("click", async e => {
   const global = e.target.closest("#globalRegenerate,#globalRandomize");
   if (global) {
@@ -1071,6 +1074,36 @@ function pruneVideoSliders() {
 function videoSummaryText() {
   const n = selectedVideoSpecs().length;
   return `${n} slider${n === 1 ? "" : "s"} selected`;
+}
+// Draws the magenta run connecting the toggled slider buttons down to the render
+// foot. Both live in the same scroll flow (the actions row scrolls with the
+// stack), so a single absolute line in the panel's coordinate space stays put as
+// it scrolls. Anchored to the toggle-column center; spans topmost active toggle
+// → play foot center. Re-measured on each render, drawer-open, and resize.
+function layoutVideoConnector() {
+  if (!controlsPanel) return;
+  let line = controlsPanel.querySelector(".video-connector");
+  const toggles = [...controlsPanel.querySelectorAll(".ctl-video-toggle.active")];
+  const play = controlsPanel.querySelector("#globalVideo");
+  if (!toggles.length || !play) { if (line) line.hidden = true; return; }
+  const panelRect = controlsPanel.getBoundingClientRect();
+  if (!panelRect.height) { if (line) line.hidden = true; return; }
+  const togRects = toggles.map(t => t.getBoundingClientRect());
+  const playRect = play.getBoundingClientRect();
+  const top = Math.min(...togRects.map(r => r.top + r.height / 2)) - panelRect.top;
+  const bottom = playRect.top + playRect.height / 2 - panelRect.top;
+  const x = togRects[0].left + togRects[0].width / 2 - panelRect.left;
+  if (bottom <= top) { if (line) line.hidden = true; return; }
+  if (!line) {
+    line = document.createElement("div");
+    line.className = "video-connector";
+    line.setAttribute("aria-hidden", "true");
+    controlsPanel.appendChild(line);
+  }
+  line.hidden = false;
+  line.style.left = `${x}px`;
+  line.style.top = `${top}px`;
+  line.style.height = `${bottom - top}px`;
 }
 function updateVideoFrames() {
   const videoFrames = controlsPanel.querySelector("#videoFrames");
