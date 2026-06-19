@@ -14,6 +14,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Optional, Tuple
 
+from canvas.canvas import new_layer_id
 from state_machine.errors import (
 	ActionError,
 	ActionResult,
@@ -129,6 +130,7 @@ class CanvasAddLayer(CanvasAction):
 		if kind not in ("background", "filter", "object"):
 			raise self.error(ERROR_INVALID_INPUT, f"add_layer 'kind' must be 'background', 'filter', or 'object' (got {kind!r}).")
 		entry = {
+			"id": new_layer_id(),
 			"slug": slug,
 			"kind": kind,
 			"controls": dict(self.content.get("controls") or {}),

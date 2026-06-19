@@ -236,6 +236,10 @@ function animateRenderMeter(from, to, seconds) {
 }
 function renderRenderStatus(ev) {
   clearTimeout(renderMeterHide);
+  // Any new status supersedes an in-flight timeout-paced fill: cancel it so the
+  // estimate animation can't keep overwriting real progress (e.g. video_frame
+  // updates getting stomped by the previous layer's slow fill-to-timeout).
+  cancelAnimationFrame(renderMeterFrame);
   const total = Math.max(1, Number(ev.total_layers) || 1);
   const cached = Math.max(0, Number(ev.cached_layers) || 0);
   const idx = Math.max(1, Number(ev.layer_index) || cached + 1);
@@ -828,7 +832,7 @@ controlsPanel.addEventListener("click", async e => {
   if (videoTier) { runVideoTier(videoTier); return; }
   const videoToggle = e.target.closest("[data-video-toggle]");
   if (videoToggle) {
-    const key = controlKey(videoToggle.dataset.chain, videoToggle.dataset.name);
+    const key = controlKey(videoToggle.dataset.layerId, videoToggle.dataset.name);
     if (videoSliders.has(key)) videoSliders.delete(key);
     else videoSliders.add(key);
     renderControlsPanel(currentControlsPanels);
@@ -957,9 +961,10 @@ function renderWidget(panel, spec) {
   const id = `c${panel.chain_index}-${spec.name}`;
   if (spec.type === "slider") {
     const cur = stagedValue(panel.chain_index, spec.name, v[spec.name] ?? spec.default);
-    const key = controlKey(panel.chain_index, spec.name);
-    const active = videoSliders.has(key);
-    return `<div class="ctl-row ctl-slider-row${active ? " video-selected" : ""}" data-chain="${panel.chain_index}" data-name="${esc(spec.name)}"><span>${esc(spec.label)}</span><input id="${id}" type="range" min="${spec.min}" max="${spec.max}" step="${spec.step}" value="${cur}" style="--fill:${sliderPct(spec.min, spec.max, cur)}%" data-chain="${panel.chain_index}" data-name="${esc(spec.name)}" data-kind="slider"><span class="ctl-val">${fmtNum(cur)}</span><div class="ctl-lane"><button type="button" class="ctl-video-toggle${active ? " active" : ""}" data-video-toggle data-chain="${panel.chain_index}" data-name="${esc(spec.name)}" aria-pressed="${active ? "true" : "false"}" title="Sweep this slider in the video." aria-label="Sweep ${esc(spec.label)} in video"><svg viewBox="0 0 24 24" width="11" height="11" aria-hidden="true"><path fill="currentColor" d="M8 5v14l11-7z"/></svg></button></div></div>`;
+    // Video selection is keyed by the layer's stable id (not its shifting chain
+    // position) so a toggle stays attached to its layer across reorders/deletes.
+    const active = videoSliders.has(controlKey(panel.id, spec.name));
+    return `<div class="ctl-row ctl-slider-row${active ? " video-selected" : ""}" data-chain="${panel.chain_index}" data-name="${esc(spec.name)}"><span>${esc(spec.label)}</span><input id="${id}" type="range" min="${spec.min}" max="${spec.max}" step="${spec.step}" value="${cur}" style="--fill:${sliderPct(spec.min, spec.max, cur)}%" data-chain="${panel.chain_index}" data-name="${esc(spec.name)}" data-kind="slider"><span class="ctl-val">${fmtNum(cur)}</span><div class="ctl-lane"><button type="button" class="ctl-video-toggle${active ? " active" : ""}" data-video-toggle data-layer-id="${esc(panel.id)}" data-name="${esc(spec.name)}" aria-pressed="${active ? "true" : "false"}" title="Sweep this slider in the video." aria-label="Sweep ${esc(spec.label)} in video"><svg viewBox="0 0 24 24" width="11" height="11" aria-hidden="true"><path fill="currentColor" d="M8 5v14l11-7z"/></svg></button></div></div>`;
   }
   if (spec.type === "bool") {
     const on = !!stagedValue(panel.chain_index, spec.name, v[spec.name] ?? spec.default);
@@ -1059,15 +1064,21 @@ function selectedVideoSpecs() {
   for (const panel of currentControlsPanels) {
     for (const spec of (panel.schema || [])) {
       if (spec.type !== "slider") continue;
-      if (videoSliders.has(controlKey(panel.chain_index, spec.name))) specs.push({chain_index: Number(panel.chain_index), name: spec.name});
+      // Selection is stored by stable id; translate to the layer's current
+      // position for the render request (the video API renders by chain_index).
+      if (videoSliders.has(controlKey(panel.id, spec.name))) specs.push({chain_index: Number(panel.chain_index), name: spec.name});
     }
   }
   return specs;
 }
+// Selection is keyed by stable layer id, so it survives reorders/deletes (UI- or
+// agent-initiated) on its own: just drop keys whose layer or slider no longer
+// exists. A swapped-in technique gets a new layer id, so its stale toggles fall
+// out here too.
 function pruneVideoSliders() {
   const valid = new Set();
   for (const panel of currentControlsPanels) {
-    for (const spec of (panel.schema || [])) if (spec.type === "slider") valid.add(controlKey(panel.chain_index, spec.name));
+    for (const spec of (panel.schema || [])) if (spec.type === "slider") valid.add(controlKey(panel.id, spec.name));
   }
   for (const key of [...videoSliders]) if (!valid.has(key)) videoSliders.delete(key);
 }

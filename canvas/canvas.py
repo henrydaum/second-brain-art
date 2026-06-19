@@ -8,6 +8,7 @@ shape and the small set of legal in-place mutations.
 
 from __future__ import annotations
 
+import secrets
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -17,6 +18,14 @@ DEFAULT_SIZE = 1024
 MIN_SIZE = 256
 MAX_SIZE = 2048
 MAX_CHAIN_LENGTH = 6
+
+
+def new_layer_id() -> str:
+	"""Url-safe short id for a layer. Same format as ``_new_canvas_id`` in
+	canvas/state.py. A layer's id is minted once at creation and then stays
+	stable across every mutation (move/delete/control-edit), so frontends can
+	track a layer by identity instead of by its shifting chain position."""
+	return secrets.token_urlsafe(8).rstrip("=")
 
 
 @dataclass
@@ -57,12 +66,19 @@ class Canvas:
 			return cls()
 		# Tolerate a legacy square ``size`` key (→ width == height == size).
 		legacy = int(data.get("size") or DEFAULT_SIZE)
+		# Tolerate the old ``last_chain`` key during the rename window.
+		layers = list(data.get("layers") or data.get("last_chain") or [])
+		# Backfill a stable id for any layer that predates layer ids (in-memory
+		# only — no data migration). Guarantees every live layer is addressable
+		# by identity so frontend selection survives reorders/deletes.
+		for step in layers:
+			if isinstance(step, dict) and not step.get("id"):
+				step["id"] = new_layer_id()
 		return cls(
 			width=int(data.get("width") or legacy),
 			height=int(data.get("height") or legacy),
 			palette_id=str(data.get("palette_id") or DEFAULT_PALETTE_ID),
-			# Tolerate the old ``last_chain`` key during the rename window.
-			layers=list(data.get("layers") or data.get("last_chain") or []),
+			layers=layers,
 		)
 
 	# ── pure mutations ───────────────────────────────────────────────

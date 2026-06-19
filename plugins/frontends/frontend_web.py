@@ -1984,7 +1984,7 @@ def _canvas_payload_full(runtime, session_key: str, state: dict | None) -> dict:
         slug = step.get("slug") or ""
         name = technique.name if technique else slug
         kind = step.get("kind") or (technique.kind if technique else "")
-        layers.append({"chain_index": idx, "slug": slug, "technique_name": name, "kind": kind})
+        layers.append({"id": step.get("id"), "chain_index": idx, "slug": slug, "technique_name": name, "kind": kind})
         schema = list(getattr(technique, "controls", None) or [])
         values = dict(step.get("controls") or {})
         if not any(c.get("type") == "palette" for c in schema):
@@ -1996,6 +1996,7 @@ def _canvas_payload_full(runtime, session_key: str, state: dict | None) -> dict:
             # state across layers.
             values["palette"] = state.get("palette_id") or DEFAULT_PALETTE_ID
         panels.append({
+            "id": step.get("id"),
             "chain_index": idx,
             "slug": getattr(technique, "slug", slug),
             "technique_name": name,
