@@ -8,7 +8,7 @@
     {
       title: "Ask for an image.",
       body: "Type a request into the chat and Second Brain will render an image.",
-      note: "This can take a little while. Press the '+ New canvas' button to retry."
+      note: "This can take a few seconds. Press the '⟳ New canvas' button to retry."
     },
     {
       title: "Build on it.",
@@ -32,13 +32,13 @@
     },
     {
       title: "Use advanced settings.",
-      body: "Open settings to enable technique authoring or include community techniques.",
+      body: "Open settings to enable 'Technique Authoring' and 'Community Techniques' — experimental features.",
       note: "Second Brain uses code to generate images. Writing new code typically takes longer because Second Brain tests it and checks for bugs."
     },
     {
-      title: "Keep links you care about.",
-      body: "Share links are persistent URLs.",
-      note: "If you want a durable reference, keep the share link."
+      title: "Go deep into the source code.",
+      body: "Second Brain is open-source and available at: https://github.com/henrydaum/second-brain-art. Feel free to contribute or build on it!",
+      note: "You can download Second Brain to run it on your own machine."
     }
   ];
 

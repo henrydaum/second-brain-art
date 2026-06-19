@@ -3,17 +3,32 @@
 //
 // TIPS shows in the empty chat.
 const TIPS = [
-  "Second Brain writes and executes code to make images — it doesn't use a diffusion image model.",
-  "You can have up to six layers in a single canvas, each with up to four settings.",
-  "Use Download for an image file, or Share for a persistent remixable link.",
-  "You can completely avoid talking to an AI by using the manual controls.",
-  "Conversations are ephemeral — your messages are cleared from the database whenever you start a new chat, or after 24 hours, whichever comes first.",
-  "You can use ctrl/cmd + Z to undo changes, and ctrl/cmd + shift + Z to redo them.",
-  "You can download at 2× resolution, or ½.",
-  "Pressing 'Randomize' will generate a new image with a random seed, whereas 'Regenerate' will keep the same seed.",
-  "If you hit 'Search,' you'll get technique results based on semantic similarity to your query — not just keywords.",
-  "For any questions or feedback, please contact secondbrainservice@gmail.com",
-  "Second Brain Art is built on top of Second Brain, a programmable open-source agentic framework made by Henry Daum, available at github.com/henrydaum/second-brain",
-  "The settings button can enable technique authoring and community techniques for this browser.",
-  "Persistent share links can be opened and remixed by anyone with the URL."
+  // How it works
+  "Second Brain executes Python code to generate images. It does not use AI image models.",
+  "You can skip the chatbot part entirely and build everything by hand in the control panel.",
+
+  // Layers & control panel
+  "There can be up to six layers per canvas, with five controls each.",
+  "Editing later layers is faster than editing earlier ones.",
+  "Press 'Randomize' to vary the starting conditions of the canvas, resulting in a slightly different image.",
+  "The aspect ratio can be changed in the Settings.",
+
+  // GIFs / video
+  "Make GIFs by selecting the slider controls you want to animate, then pressing the 'GIF' button. The video system is colored magenta.",
+  "You can cancel a GIF render by pressing the 'GIF' button again, then hitting 'Cancel'",
+  "GIFs take longer to render when there are more layers, higher FPS, longer durations, and/or higher resolutions.",
+
+  // Sharing & saving
+  "Press 'Share' to get a link anyone can open and remix, or a QR code.",
+  "Share links are permanent, so you can revisit canvases that you care about.",
+  "You can download images in 4k!",
+
+  // Housekeeping
+  "Your data is not kept. Conversations clear after you start a new chat or after 24 hours.",
+  "Undo with `ctrl/cmd + z`, redo with `ctrl/cmd + shift + z`",
+
+  // Meta
+  "This project is open-source and available at: github.com/henrydaum/second-brain-art",
+  "For questions and feedback, contact: secondbrainservice@gmail.com",
+  "Second Brain Art is completely free to use."
 ];

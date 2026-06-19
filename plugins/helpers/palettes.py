@@ -159,7 +159,7 @@ _CATALOG: list[Palette] = [
 
 _BY_ID: dict[str, Palette] = {p.id: p for p in _CATALOG}
 
-DEFAULT_PALETTE_ID = "japandi"
+DEFAULT_PALETTE_ID = "bauhaus"
 
 
 def list_palettes() -> list[Palette]:

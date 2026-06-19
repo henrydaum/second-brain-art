@@ -122,14 +122,14 @@ article.credit-error { display: grid; gap: 7px; color: var(--muted); background:
 
 /* ---- Tutorial carousel ---- */
 #emptyState.tutorial-host { padding: 24px; }
-.tutorial { display: flex; flex-direction: column; gap: 18px; padding: 28px 30px; max-width: 520px; width: 100%; text-align: left; background: rgba(11,13,19,.72); border: 1px solid var(--line); backdrop-filter: blur(8px); }
-.help-modal-card .tutorial { background: transparent; border: 0; padding: 4px 0 0; backdrop-filter: none; }
+.tutorial { display: flex; flex-direction: column; gap: 18px; padding: 28px 30px; width: 460px; max-width: 100%; aspect-ratio: 5 / 4; text-align: left; background: rgba(11,13,19,.72); border: 1px solid var(--line); backdrop-filter: blur(8px); box-sizing: border-box; }
+.help-modal-card .tutorial { background: transparent; border: 0; padding: 4px 0 0; backdrop-filter: none; width: 100%; aspect-ratio: 5 / 4; }
 .tutorial-step { color: var(--accent); font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
 .tutorial-step.bonus { color: var(--muted); }
 .tutorial-title { font-size: 24px; font-weight: 700; color: var(--text); margin: 0; letter-spacing: -.01em; line-height: 1.2; }
 .tutorial-body { color: var(--text); font-size: 14.5px; line-height: 1.55; margin: 0; }
 .tutorial-note { color: var(--muted); font-size: 12.5px; line-height: 1.5; font-style: italic; margin: 0; padding-left: 12px; border-left: 2px solid var(--line); }
-.tutorial-slide { display: flex; flex-direction: column; gap: 12px; min-height: 200px; }
+.tutorial-slide { display: flex; flex-direction: column; gap: 12px; flex: 1 1 auto; min-height: 0; overflow-y: auto; }
 .tutorial-chips { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 4px; }
 .tutorial-chip { background: rgba(20,24,35,.85); color: var(--text); border: 1px solid var(--line); padding: 7px 12px; cursor: pointer; font-size: 12.5px; transition: border-color 200ms ease, color 200ms ease; }
 .tutorial-chip:hover { border-color: var(--accent); color: var(--accent); }
@@ -314,7 +314,7 @@ body.share-landing.missing .share-landing-meta { text-align: center; }
 /* Play foot — the render terminus of the video system: round + magenta like the
    toggles, so it reads as theirs and stands apart from the rectangular cyan
    Regenerate/Randomize beside it. */
-.ctl-play { position: relative; z-index: 2; height: var(--lane-w); width: var(--lane-w); min-width: var(--lane-w); display: inline-flex; align-items: center; justify-content: center; padding: 0; border-radius: 50%; background: color-mix(in srgb, var(--video) 14%, #11151d); color: var(--video); border: 1px solid var(--video); cursor: pointer; line-height: 0; transition: background 140ms ease, color 140ms ease, box-shadow 140ms ease; }
+.ctl-play { position: relative; z-index: 2; height: var(--lane-w); width: var(--lane-w); min-width: var(--lane-w); display: inline-flex; align-items: center; justify-content: center; padding: 0; border-radius: 50%; background: color-mix(in srgb, var(--video) 14%, #11151d); color: var(--video); border: 1px solid var(--video); cursor: pointer; font-size: 11px; font-weight: 700; letter-spacing: .02em; line-height: 1; transition: background 140ms ease, color 140ms ease, box-shadow 140ms ease; }
 .ctl-play:hover:not(:disabled) { background: var(--video); color: #1a0e14; box-shadow: 0 0 0 3px var(--video-glow); }
 .ctl-play:disabled { opacity: .4; cursor: default; color: var(--muted); border-color: var(--line); background: #11151d; }
 .ctl-palette { grid-template-columns: 86px 1fr; }
@@ -462,8 +462,8 @@ body.legal-body { background:
   .es-chips { max-width: none; }
 
   #emptyState.tutorial-host { padding: 16px; }
-  .tutorial { padding: 16px 16px; gap: 10px; max-width: none; }
-  .tutorial-slide { min-height: 0; gap: 8px; }
+  .tutorial { padding: 16px 16px; gap: 10px; }
+  .tutorial-slide { gap: 8px; }
   .tutorial-title { font-size: 19px; }
   .tutorial-body { font-size: 13px; line-height: 1.5; }
   .tutorial-note { font-size: 12px; line-height: 1.45; padding-left: 10px; }

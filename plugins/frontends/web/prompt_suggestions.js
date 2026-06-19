@@ -14,7 +14,6 @@ const PROMPT_SUGGESTIONS = [
 
   // Background + object combos
   { prompt: "Add a Color Field background with a 3D Menger Sponge on top, and increase the depth to 3.", label: "3D Menger Sponge" },
-  { prompt: "Add a continuous attractor background, then add Typography over it in regular font saying 'What you see is what you get.'", label: "Typography poster" },
 
   // Filter-heavy showcases — evocative labels
   { prompt: "Load the Julia Explorer and give it the Ink & Paper palette. Then invert the colors with the Invert filter. Finally, add the Glitch Slice and Kaleidoscope filters.", label: "Oriental rug pattern" },
