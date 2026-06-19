@@ -31,7 +31,7 @@
 @supports not selector(::-webkit-scrollbar) {
   * { scrollbar-width: thin; scrollbar-color: rgba(154,166,189,.5) transparent; }
 }
-body { margin: 0; min-height: 100vh; background: radial-gradient(circle at 70% 20%, var(--accent-2-glow, #302047) 0, transparent 32%), var(--bg); color: var(--text); font: 15px/1.45 Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif; transition: background 600ms ease; }
+body { margin: 0; min-height: 100vh; min-height: 100dvh; background: radial-gradient(circle at 70% 20%, var(--accent-2-glow, #302047) 0, transparent 32%), var(--bg); color: var(--text); font: 15px/1.45 Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif; transition: background 600ms ease; }
 button, input { font: inherit; }
 
 /* ---- Shell: chat left, square canvas right ---- */
@@ -88,7 +88,10 @@ article.credit-error { display: grid; gap: 7px; color: var(--muted); background:
 .composer { height: var(--chat-rail-height); position: relative; overflow: hidden; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px; padding: 16px; border-top: 1px solid var(--line); background: #0b0d12; }
 .composer.busy { box-shadow: inset 0 0 0 1px rgba(255,255,255,.10); }
 .composer.busy::before { content: ""; position: absolute; left: 0; top: 0; width: 200%; height: 2px; background: linear-gradient(90deg, var(--accent) 0%, var(--accent-2) 25%, var(--accent) 50%, var(--accent-2) 75%, var(--accent) 100%); animation: composerRail 2.4s linear infinite; pointer-events: none; }
-.composer input { min-width: 0; height: 44px; border: 1px solid var(--line); background: #151923; color: var(--text); padding: 0 13px; outline: none; transition: border-color 200ms ease; }
+/* 16px is iOS Safari's auto-zoom threshold: any smaller and focusing the field
+   zooms the page to frame it. Pin to 16px so tapping the chat bar on mobile
+   doesn't zoom (negligible visual change on desktop). */
+.composer input { min-width: 0; height: 44px; font-size: 16px; border: 1px solid var(--line); background: #151923; color: var(--text); padding: 0 13px; outline: none; transition: border-color 200ms ease; }
 .composer.busy input { opacity: .58; color: var(--muted); border-color: rgba(255,255,255,.14); }
 .composer input:focus { border-color: var(--accent); }
 .composer button { height: 44px; min-width: 82px; background: var(--accent); border: 0; font-weight: 800; color: #08090d; transition: background 200ms ease, filter 160ms ease; }
@@ -402,19 +405,33 @@ body.legal-body { background:
 .privacy-page a:hover { color: var(--text); }
 .privacy-page .back-link-foot { margin-top: 24px; }
 
-@media (max-width: 960px) {
-  .shell { grid-template-columns: 1fr; }
+@media (max-width: 960px) and (orientation: portrait) {
+  /* Portrait phones/tablets: stack into a single column pinned to the viewport
+     so the whole app fits on one screen — no page scroll. Rows: header / square
+     canvas / flexible middle / composer. The middle row (chat OR controls
+     drawer, only one shown) is the 1fr that soaks up whatever's left after the
+     fixed canvas + rails and scrolls internally, so neither the chat nor the
+     controls panel can stretch the page. (Landscape keeps the two-column desktop
+     layout — see the orientation:landscape rule below.) */
+  .shell { grid-template-columns: 1fr; height: 100vh; height: 100dvh; grid-template-rows: auto auto minmax(0, 1fr) auto; }
   .chat { display: contents; }
   .chat > header { order: -3; background: rgba(8,9,13,.94); }
   .showcase { order: -2; aspect-ratio: 1 / 1; height: auto; min-height: 0; }
   .showcase:not(.has-image) #emptyState { min-height: 0; }
-  /* Fixed height tied to the square canvas (showcase is aspect 1/1 at full
-     column width, so its height ≈ 100vw): the chat stays a constant,
-     proportional length instead of growing without bound. */
-  .messages { order: -1; height: 100vw; min-height: 0; background: rgba(8,9,13,.94); }
-  .controls-drawer { order: -1; min-height: 42vh; }
+  .messages { order: -1; min-height: 0; background: rgba(8,9,13,.94); }
+  .controls-drawer { order: -1; min-height: 0; }
   .composer { order: 0; }
   h2 { font-size: 34px; }
+}
+
+/* Landscape phones are wide-but-short — the same shape the desktop two-column
+   layout is built for. Keep the chat column + square canvas side by side rather
+   than stacking them (the single-column block above is portrait-only). The
+   canvas is height-anchored (min(100dvh, 70vw)) so the whole square fits the
+   short viewport, and the chat min-width is dropped so narrow landscape phones
+   don't overflow into a horizontal scroll. */
+@media (max-width: 960px) and (orientation: landscape) {
+  .shell { grid-template-columns: minmax(0, 1fr) min(100dvh, 70vw); height: 100vh; height: 100dvh; }
 }
 
 /* ---- Phone-sized screens ----
