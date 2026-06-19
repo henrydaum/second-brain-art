@@ -99,6 +99,7 @@ const chatClear = document.querySelector("#chatClear");
 // ----- Technique search (used when the controls drawer is open) -----
 let techniquesCache = [];            // last /api/techniques response
 let techniquesLoading = null;        // in-flight fetch promise (dedup)
+let techniquesLoaded = false;        // cache is warm → reuse it, don't refetch on every focus
 let inSearchMode = false;        // drawer open → input is a technique picker
 let searchFocused = false;       // input focused while in search mode → results take over the column
 const CHAT_PLACEHOLDER = input.placeholder;
@@ -357,9 +358,9 @@ async function saveSetting(key, value) {
     settingsStatus.hidden = false;
     settingsStatus.className = "modal-status ok";
     settingsStatus.textContent = "Saved.";
-    techniquesCache = [];
-    techniquesLoading = null;
-    loadTechniques();
+    // Installed techniques can change with settings/packages — force a refresh,
+    // then repaint if the user is mid-search.
+    loadTechniques(true).then(() => updateSearch());
   } catch (err) {
     settingsStatus.hidden = false;
     settingsStatus.className = "modal-status err";
@@ -621,13 +622,18 @@ function setControlsOpen(open) {
 }
 
 // ----- Technique search wiring -----
-async function loadTechniques() {
+// The catalog only changes when packages are installed/uninstalled (settings
+// save forces a reload below), so fetch it once and reuse the cache — every
+// later focus then renders instantly instead of waiting on a round-trip.
+function loadTechniques(force = false) {
+  if (techniquesLoaded && !force) return Promise.resolve();
   if (techniquesLoading) return techniquesLoading;
   techniquesLoading = (async () => {
     try {
       const r = await get("/api/techniques");
       techniquesCache = Array.isArray(r.techniques) ? r.techniques : [];
-    } catch { techniquesCache = []; }
+      techniquesLoaded = true;
+    } catch { /* keep any prior cache; allow a later retry */ }
     finally { techniquesLoading = null; }
   })();
   return techniquesLoading;
@@ -735,7 +741,8 @@ function setSearchMode(on) {
       sendBtn.textContent = "Search";
       sendBtn.disabled = !input.value.trim();
     }
-    loadTechniques().then(() => updateSearch());
+    if (techniquesLoaded) updateSearch();           // paint instantly from warm cache
+    loadTechniques().then(() => updateSearch());    // first-ever load (else a no-op)
   } else {
     input.placeholder = CHAT_PLACEHOLDER;
     if (!agentBusy) {
@@ -752,7 +759,8 @@ input.addEventListener("input", () => { updateClearBtn(); updateSearch(); });
 input.addEventListener("focus", () => {
   if (!inSearchMode) return;
   searchFocused = true;
-  loadTechniques().then(() => updateSearch());
+  if (techniquesLoaded) updateSearch();           // paint instantly from warm cache
+  loadTechniques().then(() => updateSearch());    // first-ever load (else a no-op)
 });
 input.addEventListener("blur", () => {
   // Leaving the bar reverts the column to the layer controls. Clicks inside the
@@ -1509,3 +1517,6 @@ document.addEventListener("keydown", async (e) => {
 connectEvents();
 const bootingShare = new URLSearchParams(location.search).has("share");
 loadHistory(); loadPalettes(); if (bootingShare) handleShareDeepLink(); else loadCanvas(); refreshSettings();
+// Warm the technique catalog in the background so the very first search focus is
+// instant too (not just subsequent ones).
+loadTechniques();
