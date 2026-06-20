@@ -14,7 +14,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Optional, Tuple
 
-from canvas.canvas import new_layer_id
+from canvas.canvas import MAX_CHAIN_LENGTH, new_layer_id
 from state_machine.errors import (
 	ActionError,
 	ActionResult,
@@ -129,6 +129,25 @@ class CanvasAddLayer(CanvasAction):
 			raise self.error(ERROR_INVALID_INPUT, "add_layer requires 'technique_slug'.")
 		if kind not in ("background", "filter", "object"):
 			raise self.error(ERROR_INVALID_INPUT, f"add_layer 'kind' must be 'background', 'filter', or 'object' (got {kind!r}).")
+		# Enforce the chain-length cap. Backgrounds replace layer 0 (they never
+		# grow the chain) so they're always allowed; only filters/objects append.
+		# The cap is configurable: callers thread the live setting in via
+		# 'max_layers'; absent/invalid, we fall back to the MAX_CHAIN_LENGTH
+		# default so the invariant holds even if a caller forgets to pass it.
+		if kind in ("filter", "object"):
+			try:
+				max_layers = int(self.content.get("max_layers"))
+			except (TypeError, ValueError):
+				max_layers = MAX_CHAIN_LENGTH
+			if max_layers < 1:
+				max_layers = MAX_CHAIN_LENGTH
+			if len(self.cs.canvas.layers) >= max_layers:
+				raise self.error(
+					ERROR_INVALID_ACTION,
+					f"Canvas is at its {max_layers}-layer limit "
+					f"(1 background + {max_layers - 1} filters/objects). "
+					f"Remove a layer before adding another.",
+				)
 		entry = {
 			"id": new_layer_id(),
 			"slug": slug,

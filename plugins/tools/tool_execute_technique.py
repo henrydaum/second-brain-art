@@ -103,6 +103,10 @@ class ExecuteTechnique(BaseTool):
 		 "Wall-clock seconds before a single technique run is killed. Raise for heavy compute; lower to catch runaway loops sooner.",
 		 30,
 		 {"type": "slider", "range": (5, 180, 35), "is_float": False}),
+		("Maximum Canvas Layers", "max_canvas_layers",
+		 "Most layers a single canvas may hold (1 background + the rest filters/objects). Backgrounds replace layer 0 and never count against the cap.",
+		 6,
+		 {"type": "integer"}),
 	]
 
 	def agent_prompt_for(self, ctx) -> str:
@@ -141,9 +145,10 @@ class ExecuteTechnique(BaseTool):
 
 		db = getattr(context, "db", None)
 		try:
+			max_layers = int((getattr(context, "config", {}) or {}).get("max_canvas_layers") or 6)
 			add_result, render_result = canvas_rt.render_actions(
 				cs.canvas_id,
-				[("add_layer", {"technique_slug": slug, "kind": kind, "controls": params})],
+				[("add_layer", {"technique_slug": slug, "kind": kind, "controls": params, "max_layers": max_layers})],
 				lambda state: render_canvas(
 					state,
 					technique_loader=technique_registry.get_record,

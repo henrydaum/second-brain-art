@@ -540,9 +540,10 @@ class WebFrontend(BaseFrontend):
         if technique is None:
             return [{"type": "error", "content": f"Unknown technique: {technique_slug!r}"}]
         key = self.session_key(session_id)
+        max_layers = int((getattr(self.runtime, "config", {}) or {}).get("max_canvas_layers") or 6)
         events = self._new_canvas_action_events(
             key, "add_layer",
-            {"technique_slug": technique_slug, "kind": technique.kind, "controls": {}},
+            {"technique_slug": technique_slug, "kind": technique.kind, "controls": {}, "max_layers": max_layers},
             fail_prefix="Add layer failed",
         )
         if events and events[0].get("type") == "hero_image" and not (events[0].get("canvas") or {}).get("path"):
