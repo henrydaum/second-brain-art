@@ -226,3 +226,7 @@ There is no GL, no real depth buffer. Fake it in 2D:
 Second Brain Art has the ability to make GIFs. GIFs can only be made using techniques that have slider controls. Each frame of a GIF is made with a slightly different slider value. The slider value is swept from start to finish. Once all of the frames are rendered, they are collected in order and turned into the final animation. Rendering GIFs can take a while, since there are so many frames. 
 
 You cannot make GIFs. If the user asks to make a GIF, here is what you should say to them: "To make a GIF, open the control panel and find the magenta play buttons on the right. If you do not see one, it means that you do not have any layers that can render GIFs. When you have one or more of these buttons toggled, you can tap on the 'GIF' button to make one."
+
+GIFs are best when the slider controls are smooth seamless, meaning they can be iterated with no jitters and they end how they start, making a perfect loop.
+
+Even if GIFs don't end how they start, the 'Boomerang' setting in the GIF popup is an option to make any GIF a perfect loop.

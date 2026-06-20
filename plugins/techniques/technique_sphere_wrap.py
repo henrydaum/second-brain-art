@@ -11,7 +11,7 @@ except NameError:
 
 class SphereWrapTechnique(BaseTechnique):
     name = 'Sphere Wrap'
-    description = 'Wraps the current canvas around a 3-D sphere seen face-on, turning any image into a planet or marble: each pixel inside the disk is back-projected to a longitude and latitude on the globe, the source sampled there, then shaded with a sun-lit terminator and a soft rim so it reads as a solid ball floating on the background. The pinched poles dissolve into smooth caps so even a texture with dark or mismatched edges wraps cleanly. By default it wraps like a globe (a world-map look), but a texture whose left and right edges differ will show a faint vertical seam; turn on "seamless" to instead read the texture in polar coordinates so there is no seam at all — the content swirls radially around the poles (the same result as running Polar Coordinates "to polar" before this filter, but in one layer). Sweep "rotation" for a seamless looping GIF — the planet spins exactly once around its axis so the last frame rejoins the first (leave Boomerang off). "tilt" leans the axis toward or away, "light" moves the sun (and the shadow), "zoom" sizes the globe. Distinct from polar_coordinates ("little planet") and fisheye. A filter — run over any background. Good for "sphere", "planet", "globe", "marble", "wrap", "3D ball", "world", or turning a texture into a rotating orb.'
+    description = 'Wraps the current canvas around a 3-D sphere seen face-on, turning any image into a planet or marble: each pixel inside the disk is back-projected to a longitude and latitude on the globe, the source sampled there, then shaded with a sun-lit terminator and a soft rim so it reads as a solid ball floating on the background. Near the poles the wrap eases toward the texture\'s middle so the inevitable pinch shows continuous surface rather than a smeared dark cap. By default it wraps like a globe (a world-map look), but a texture whose left and right edges differ will show a faint vertical seam; turn on "seamless" to instead read the texture in polar coordinates so there is no seam at all — the content swirls radially around the poles (the same result as running Polar Coordinates "to polar" before this filter, but in one layer). Sweep "rotation" for a seamless looping GIF — the planet spins exactly once around its axis so the last frame rejoins the first (leave Boomerang off). "tilt" leans the axis toward or away, "light" moves the sun (and the shadow), "zoom" sizes the globe. Distinct from polar_coordinates ("little planet") and fisheye. A filter — run over any background. Good for "sphere", "planet", "globe", "marble", "wrap", "3D ball", "world", or turning a texture into a rotating orb.'
     kind = "filter"
 
     rotation = Slider(0, 1, default=0, step=0.005)
@@ -64,11 +64,21 @@ class SphereWrapTechnique(BaseTechnique):
             sy = (H - 1) / 2.0 + np.sin(theta) * radius
             sampled = art_kit.bilinear_sample(arr, sx, sy)
         else:
-            # Globe wrap. Longitude wraps; latitude clamps. (art_kit.bilinear_sample
-            # only clamps, leaving a hard seam where u wraps 1->0, so sample manually
+            # Globe wrap. Equirectangular pinches the texture's top/bottom EDGE
+            # rows into the poles, which goes ugly (smeared dark caps) for any
+            # texture with dark edges. Rather than paste a flat colour cap (which
+            # reads as a muddy blob), pull the sampled latitude toward the equator
+            # near the poles: the pinch then shows stretched mid-texture, which
+            # continues the surface naturally instead of the degenerate edges.
+            latfrac = np.abs(lat) / (math.pi / 2.0)
+            pw = np.clip((latfrac - 0.6) / 0.38, 0.0, 1.0)
+            pw = pw * pw * (3.0 - 2.0 * pw)
+            vg = v * (1.0 - pw) + 0.5 * pw
+            # Longitude wraps; latitude clamps. (art_kit.bilinear_sample only
+            # clamps, leaving a hard seam where u wraps 1->0, so sample manually
             # with x-wrap to blend the texture's left and right edges.)
             fx = u * W
-            fy = v * (H - 1)
+            fy = vg * (H - 1)
             x0f = np.floor(fx)
             y0f = np.floor(fy)
             wx = (fx - x0f)[..., None]
@@ -81,18 +91,7 @@ class SphereWrapTechnique(BaseTechnique):
             bot = arr[y1, x0] * (1.0 - wx) + arr[y1, x1] * wx
             sampled = top * (1.0 - wy) + bot * wy
 
-        # Equirectangular pinches everything near the poles into a thin smear of
-        # the texture's top/bottom rows — which goes ugly (often black) for any
-        # texture with dark edges. Dissolve the caps into a representative colour
-        # taken from the texture's middle band so the poles always read clean.
-        lo, hi = int(H * 0.3), int(H * 0.7)
-        cap = arr[lo:hi].mean(axis=(0, 1))
-        latfrac = np.abs(lat) / (math.pi / 2.0)
-        t = np.clip((latfrac - 0.55) / (0.95 - 0.55), 0.0, 1.0)
-        capw = (t * t * (3.0 - 2.0 * t))[..., None]        # smoothstep cap weight
-        tex = sampled * (1.0 - capw) + cap[None, None, :] * capw
-
-        out = tex * shade[..., None] + rim[..., None]
+        out = sampled * shade[..., None] + rim[..., None]
         bg = np.array(art_kit.hex_to_rgb(canvas.palette.background), dtype=np.float64) / 255.0
         out = np.where(mask[..., None], np.clip(out, 0.0, 1.0), bg[None, None, :])
         canvas.commit_array(out)

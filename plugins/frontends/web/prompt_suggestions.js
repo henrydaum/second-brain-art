@@ -31,5 +31,8 @@ const PROMPT_SUGGESTIONS = [
 
   // GIF material
   { prompt: "Show me the Color Field background with the Tesseract technique, then put the CRT filter on it. Explain how to make a GIF using the Rot Zw slider.", label: "Tesseract" },
-  { prompt: "Make a ", label: "Custom Planet" },
+  { prompt: "Apply the 'Op Art' background, then add Sphere Wrap to make it look like a planet.", label: "Striped Planet" },
+  { prompt: "Apply the 'Marble' background, then put the Oil Slick filter on it. Explain how to use the 'thickness' slider control to make a seamless GIF.", label: "Iridescence" },
+  { prompt: "Apply the 'Quasicrystal' background, and make the settings a bit better. Then add Posterize to Palette. Explain how to use the 'phase' slider to make a seamless GIF.", label: "Sun Flow" },
+  { prompt: "Do the Inverted Julia background, then add Chromatic Aberration and the Fisheye lens. Change to Neutral Mono palette. Explain how to make a GIF using the Fisheye and Aberration 'Strength' sliders to make a seamless GIF with the boomerang effect.", label: "Sun Flow" },
 ];
