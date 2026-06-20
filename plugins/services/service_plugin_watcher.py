@@ -149,14 +149,16 @@ class PluginWatcherService(BaseService):
             name, error = None, str(e)
         if error:
             logger.warning(f"Plugin watcher failed to load {path.name}: {error}")
-            self._notify(f"✕ Plugin registration failed: {name or path.name}\n{error}")
+            if not self._silent(info):
+                self._notify(f"✕ Plugin registration failed: {name or path.name}\n{error}")
             return
         if info.plugin_type == "service":
             wire_peer_services(self.services)
         if info.plugin_type == "command":
             self._refresh_commands()
         self._reconcile_plugin_config()
-        self._notify(f"✓ Registered plugin{' edit' if edited else ''}: {name}")
+        if not self._silent(info):
+            self._notify(f"✓ Registered plugin{' edit' if edited else ''}: {name}")
         logger.info(f"Plugin watcher loaded {info.plugin_type}: {name}")
 
     def _unload_plugin(self, path: Path):
@@ -181,8 +183,9 @@ class PluginWatcherService(BaseService):
         if info.plugin_type == "command":
             self._refresh_commands()
         self._reconcile_plugin_config()
-        for name in names:
-            self._notify(f"Deregistered plugin: {name}")
+        if not self._silent(info):
+            for name in names:
+                self._notify(f"Deregistered plugin: {name}")
         logger.info(f"Plugin watcher unloaded deleted {info.plugin_type}: {path.name}")
 
     def _on_quarantine(self, payload: dict):
@@ -221,6 +224,17 @@ class PluginWatcherService(BaseService):
     def _notify(self, message: str):
         """Internal helper to handle notify."""
         bus.emit(CHAT_MESSAGE_PUSHED, {"message": message, "kind": "plugin", "source": "plugin_watcher"})
+
+    def _silent(self, info) -> bool:
+        """Whether to skip the chat notice for this plugin's (re)load/unload.
+
+        Watcher notices are broadcast to every live session (the watcher has no
+        session context to target them — see CHAT_MESSAGE_PUSHED handling in
+        BaseFrontend). Sandbox techniques are reloaded constantly while their
+        author iterates on them, so that register/edit chatter would spam every
+        other connected user. Stay silent for them; authoring feedback belongs
+        to the editing tool, not the global watcher."""
+        return bool(info) and info.plugin_type == "technique" and info.root_name == "sandbox"
 
     def _technique_registry(self):
         """The runtime's technique catalog, or None before the runtime exists."""

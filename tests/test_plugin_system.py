@@ -30,15 +30,15 @@ class _ToolRegistry:
         self.tools[tool.name] = tool
 
 
-def _watched_dir(tmp_path, monkeypatch, plugin_type="tool"):
+def _watched_dir(tmp_path, monkeypatch, plugin_type="tool", root_name="test"):
     """Create a watched plugin dir under tmp_path and patch it in."""
     directory = tmp_path / "watched"
     directory.mkdir()
-    _patch_plugin_dir(monkeypatch, directory, plugin_type)
+    _patch_plugin_dir(monkeypatch, directory, plugin_type, root_name)
     return directory
 
 
-def _patch_plugin_dir(monkeypatch, directory, plugin_type="tool"):
+def _patch_plugin_dir(monkeypatch, directory, plugin_type="tool", root_name="test"):
     """Internal helper to handle patch plugin dir."""
     import plugins.helpers.plugin_paths as paths
     import plugins.services.service_plugin_watcher as watcher_mod
@@ -46,7 +46,7 @@ def _patch_plugin_dir(monkeypatch, directory, plugin_type="tool"):
     config = dict(paths.PLUGIN_CONFIG)
     directory = Path(directory).resolve()
     family = directory.name
-    root = paths.PluginRoot("test", directory.parent, "test_plugins")
+    root = paths.PluginRoot(root_name, directory.parent, "test_plugins")
     prefix = paths.PLUGIN_FAMILIES[plugin_type][1]
     config[plugin_type] = (paths.PluginDir(root, plugin_type, family, prefix),)
     monkeypatch.setattr(paths, "PLUGIN_CONFIG", config)
@@ -128,6 +128,29 @@ def test_plugin_watcher_emits_registered_and_edit_messages(tmp_path, monkeypatch
         service.handle_create_or_modify(str(path))
 
         assert messages == ["✓ Registered plugin: demo", "✓ Registered plugin edit: demo"]
+    finally:
+        unsub()
+
+
+def test_plugin_watcher_silent_for_sandbox_techniques(tmp_path, monkeypatch):
+    """Sandbox technique (re)loads must not broadcast register/edit notices.
+
+    They reload constantly while their author iterates, and watcher notices are
+    broadcast to every live session — so this chatter would spam other users."""
+    messages = []
+    path = _watched_dir(tmp_path, monkeypatch, "technique", root_name="sandbox") / "technique_demo.py"
+    path.write_text("x", encoding="utf-8")
+    unsub = bus.subscribe(CHAT_MESSAGE_PUSHED, lambda payload: messages.append(payload["message"]))
+    try:
+        monkeypatch.setattr("plugins.services.service_plugin_watcher.load_single_plugin", lambda *a, **k: ("demo", None))
+        monkeypatch.setattr("plugins.services.service_plugin_watcher.PluginWatcherService._reconcile_plugin_config", lambda self: None)
+        service = PluginWatcherService({})
+
+        service.handle_create_or_modify(str(path))
+        service._known_mtimes[str(path.resolve())] = path.stat().st_mtime - 1
+        service.handle_create_or_modify(str(path))
+
+        assert messages == []
     finally:
         unsub()
 
