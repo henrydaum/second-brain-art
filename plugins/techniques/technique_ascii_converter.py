@@ -1,4 +1,4 @@
-from plugins.BaseTechnique import BaseTechnique, Slider, Enum
+from plugins.BaseTechnique import BaseTechnique, Slider, Enum, Palette
 
 import numpy as np
 from PIL import Image, ImageDraw
@@ -22,6 +22,7 @@ class AsciiConverterTechnique(BaseTechnique):
     name = "ASCII Converter"
     description = "Re-render the canvas as a grid of Jost ASCII glyphs whose density tracks local luminance. Pick the ramp, cell size, and color mode (palette / mono / inverted)."
     kind = "filter"
+    palette = Palette()
     cell_px = Slider(8, 32, default=14, step=1)
     ramp = Enum([("classic", "Classic"), ("dense", "Dense"), ("blocks", "Blocks"), ("binary", "Binary"), ("letters", "Letters")], default="classic")
     color = Enum([("palette", "Palette"), ("mono", "Mono"), ("invert", "Invert")], default="palette")
