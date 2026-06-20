@@ -27,5 +27,9 @@ const PROMPT_SUGGESTIONS = [
   { prompt: "Show me a Gray-Scott reaction-diffusion, then apply polar coordinates.", label: "Reaction-diffusion blob" },
   { prompt: "Show me a Gray-Scott reaction-diffusion, then apply polar coordinates, and change it to 'From Polar' mode.", label: "Inverted reaction-diffusion" },
   { prompt: "Show me the Burning Ship Explorer at the Embedded Mini-Ship with the Magma palette and a Vignette. Crank the zoom.", label: "Burning Ship fractal" },
-  { prompt: "Show me a Barnsley Fern with the Neutral Mono palette.", label: "Silver fern" }
+  { prompt: "Show me a Barnsley Fern with the Neutral Mono palette.", label: "Silver fern" },
+
+  // GIF material
+  { prompt: "Show me the Color Field background with the Tesseract technique, then put the CRT filter on it. Explain how to make a GIF using the Rot Zw slider.", label: "Tesseract" },
+  { prompt: "Make a ", label: "Custom Planet" },
 ];

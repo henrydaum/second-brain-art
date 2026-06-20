@@ -11,12 +11,8 @@ The implementation contract (sandbox rules, the `canvas` surface, every
 the contract and just need the math.
 
 Do not copy snippets verbatim. Adapt for palette, composition, and the
-canvas dimensions you're rendering into. The canvas is **not always square** —
-build grids and place focal points from `canvas.width`/`canvas.height` (and
-center on `(width/2, height/2)`), not a single side length. Snippets here that
-take a scalar `size` assume a square; generalize them to width×height when the
-canvas aspect isn't 1:1. Every color in the final technique must trace back to
-a palette slot or `art_kit.palette_color(t)`.
+canvas dimensions you're rendering into. The canvas is **not always square** — build grids and place focal points from `canvas.width`/`canvas.height` (and
+center on `(width/2, height/2)`), not a single side length. Snippets here that take a scalar `size` assume a square; generalize them to width×height when the canvas aspect isn't 1:1. Every color in the final technique must trace back to a palette slot or `art_kit.palette_color(t)`.
 
 ### §1 Fractals
 
@@ -225,3 +221,8 @@ There is no GL, no real depth buffer. Fake it in 2D:
 - **Atmospheric perspective**: shift hue toward background palette slot
   as `y` (height) decreases or `z` (depth) increases.
 
+### §10 How to make GIFs
+
+Second Brain Art has the ability to make GIFs. GIFs can only be made using techniques that have slider controls. Each frame of a GIF is made with a slightly different slider value. The slider value is swept from start to finish. Once all of the frames are rendered, they are collected in order and turned into the final animation. Rendering GIFs can take a while, since there are so many frames. 
+
+You cannot make GIFs. If the user asks to make a GIF, here is what you should say to them: "To make a GIF, open the control panel and find the magenta play buttons on the right. If you do not see one, it means that you do not have any layers that can render GIFs. When you have one or more of these buttons toggled, you can tap on the 'GIF' button to make one."
