@@ -4,12 +4,12 @@
 // TIPS shows in the empty chat.
 const TIPS = [
   // How it works
-  "Second Brain executes Python code to generate images. It does not use AI image models.",
+  "Second Brain executes Python code to generate images. It does not use your typical AI image models.",
   "You can skip the chatbot part entirely and build everything by hand in the control panel.",
 
   // Layers & control panel
   "There can be up to six layers per canvas, with five controls each.",
-  "Editing later layers is faster than editing earlier ones.",
+  "Layers are rendered in order, and the results are cached. This means editing a layer will not re-render the layers below it.",
   "Press 'Randomize' to vary the starting conditions of the canvas, resulting in a slightly different image.",
   "The aspect ratio can be changed in the Settings.",
 
@@ -25,7 +25,7 @@ const TIPS = [
 
   // Housekeeping
   "Your data is not kept. Conversations clear after you start a new chat or after 24 hours.",
-  "Undo with `ctrl/cmd + z`, redo with `ctrl/cmd + shift + z`",
+  "Undo with ctrl/cmd + Z, redo with ctrl/cmd + shift + Z",
 
   // Meta
   "This project is open-source and available at: github.com/henrydaum/second-brain-art",
