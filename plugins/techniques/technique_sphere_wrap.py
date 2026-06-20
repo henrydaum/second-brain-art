@@ -18,7 +18,7 @@ class SphereWrapTechnique(BaseTechnique):
     tilt = Slider(-0.7, 0.7, default=0.2, step=0.02)
     light = Slider(0, 6.28, default=2.2, step=0.05)
     zoom = Slider(0.5, 0.98, default=0.85, step=0.01)
-    seamless = Bool(default=False, label="Seamless (polar)")
+    seamless = Bool(default=True, label="Seamless (polar)")
 
     def run(self, canvas):
         W, H = int(canvas.width), int(canvas.height)
