@@ -35,4 +35,5 @@ const PROMPT_SUGGESTIONS = [
   { prompt: "Apply the 'Marble' background, then put the Oil Slick filter on it. Explain how to use the 'thickness' slider control to make a seamless GIF.", label: "Iridescence" },
   { prompt: "Apply the 'Quasicrystal' background. Then add Posterize to Palette. Explain how to use the 'phase' slider to make a seamless GIF.", label: "Sun Flow" },
   { prompt: "Do the Inverted Julia background, then add Chromatic Aberration and the Fisheye lens. Change to Neutral Mono palette. Explain how to make a GIF using the Fisheye and Aberration 'Strength' sliders to make a seamless GIF with the boomerang effect.", label: "Trippy Loop" },
+  { prompt: "Show me a Harmonograph with a Lens Flare. Then explain how I can make a GIF using the phase and orbit parameters.", label: "Harmonograph" },
 ];
